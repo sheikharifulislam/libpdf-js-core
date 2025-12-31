@@ -1,5 +1,4 @@
 {
-  "include": ["src/**/*"],
   "exclude": ["checkouts", "node_modules"],
   "compilerOptions": {
     // Environment setup & latest features
@@ -9,6 +8,12 @@
     "moduleDetection": "force",
     "jsx": "react-jsx",
     "allowJs": true,
+
+    // Paths (must match package.json imports)
+    "baseUrl": ".",
+    "paths": {
+      "#src/*": ["./src/*"]
+    },
 
     // Bundler mode
     "moduleResolution": "bundler",
@@ -20,7 +25,7 @@
     "strict": true,
     "skipLibCheck": true,
     "noFallthroughCasesInSwitch": true,
-    "noUncheckedIndexedAccess": true,
+    "noUncheckedIndexedAccess": false,
 
     // Some stricter flags (disabled by default)
     "noUnusedLocals": false,

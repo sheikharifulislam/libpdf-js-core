@@ -1,4 +1,3 @@
-import { resolve } from "node:path";
 import { defineConfig } from "vitest/config";
 
 export default defineConfig({
@@ -11,11 +10,6 @@ export default defineConfig({
       include: ["src/**/*.ts"],
       exclude: ["src/**/*.test.ts", "src/test-utils.ts"],
       reporter: ["text", "html"],
-    },
-  },
-  resolve: {
-    alias: {
-      "#src": resolve(__dirname, "./src"),
     },
   },
 });

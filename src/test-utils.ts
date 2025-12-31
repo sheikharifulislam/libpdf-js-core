@@ -13,13 +13,7 @@ const FIXTURES_PATH = join(import.meta.dirname, "..", "fixtures");
 /**
  * Fixture categories matching the fixtures directory structure.
  */
-export type FixtureCategory =
-  | "basic"
-  | "xref"
-  | "filter"
-  | "encryption"
-  | "malformed"
-  | "text";
+export type FixtureCategory = "basic" | "xref" | "filter" | "encryption" | "malformed" | "text";
 
 /**
  * Load a PDF fixture file as a Uint8Array.
@@ -49,10 +43,7 @@ export async function loadFixture(category: FixtureCategory, filename: string) {
  * @param filename - The PDF filename
  * @returns The file contents as Buffer
  */
-export async function loadFixtureBuffer(
-  category: FixtureCategory,
-  filename: string,
-) {
+export async function loadFixtureBuffer(category: FixtureCategory, filename: string) {
   const path = join(FIXTURES_PATH, category, filename);
 
   return readFile(path);
@@ -74,7 +65,7 @@ export function toHexString(bytes: Uint8Array, maxLength = 100) {
   const slice = bytes.slice(0, maxLength);
 
   const hex = Array.from(slice)
-    .map((b) => b.toString(16).padStart(2, "0"))
+    .map(b => b.toString(16).padStart(2, "0"))
     .join(" ");
 
   return bytes.length > maxLength ? `${hex}...` : hex;
@@ -92,7 +83,7 @@ export function toAsciiString(bytes: Uint8Array, maxLength = 200) {
   const slice = bytes.slice(0, maxLength);
 
   const ascii = Array.from(slice)
-    .map((b) => (b >= 0x20 && b < 0x7f ? String.fromCharCode(b) : "."))
+    .map(b => (b >= 0x20 && b < 0x7f ? String.fromCharCode(b) : "."))
     .join("");
 
   return bytes.length > maxLength ? `${ascii}...` : ascii;
@@ -106,17 +97,11 @@ export function toAsciiString(bytes: Uint8Array, maxLength = 200) {
  * @param expected - The expected bytes
  * @param message - Optional message prefix
  */
-export function assertBytesEqual(
-  actual: Uint8Array,
-  expected: Uint8Array,
-  message?: string,
-) {
+export function assertBytesEqual(actual: Uint8Array, expected: Uint8Array, message?: string) {
   const prefix = message ? `${message}: ` : "";
 
   if (actual.length !== expected.length) {
-    throw new Error(
-      `${prefix}Length mismatch: got ${actual.length}, expected ${expected.length}`,
-    );
+    throw new Error(`${prefix}Length mismatch: got ${actual.length}, expected ${expected.length}`);
   }
 
   for (let i = 0; i < actual.length; i++) {
@@ -124,8 +109,7 @@ export function assertBytesEqual(
       throw new Error(
         `${prefix}Byte mismatch at index ${i}: got 0x${actual[i]
           ?.toString(16)
-          .padStart(2, "0")}, ` +
-          `expected 0x${expected[i]?.toString(16).padStart(2, "0")}`,
+          .padStart(2, "0")}, ` + `expected 0x${expected[i]?.toString(16).padStart(2, "0")}`,
       );
     }
   }
@@ -138,7 +122,7 @@ export function assertBytesEqual(
  * @returns Uint8Array of the string's bytes
  */
 export function stringToBytes(str: string) {
-  return new Uint8Array(str.split("").map((c) => c.charCodeAt(0)));
+  return new Uint8Array(str.split("").map(c => c.charCodeAt(0)));
 }
 
 /**
