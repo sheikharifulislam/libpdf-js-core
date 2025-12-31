@@ -1,6 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
 import { PdfArray } from "./pdf-array";
-import { PdfName } from "./pdf-name";
 import { PdfNumber } from "./pdf-number";
 
 describe("PdfArray", () => {

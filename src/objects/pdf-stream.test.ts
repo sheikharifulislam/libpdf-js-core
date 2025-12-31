@@ -28,7 +28,7 @@ describe("PdfStream", () => {
       ["Filter", PdfName.FlateDecode],
     ]);
 
-    expect(stream.getNumber("Length")).toBe(5);
+    expect(stream.getNumber("Length")?.value).toBe(5);
     expect(stream.getName("Filter")).toBe(PdfName.FlateDecode);
   });
 
@@ -40,7 +40,7 @@ describe("PdfStream", () => {
 
     const stream = new PdfStream(dict, new Uint8Array(100));
 
-    expect(stream.getNumber("Length")).toBe(100);
+    expect(stream.getNumber("Length")?.value).toBe(100);
     expect(stream.data.length).toBe(100);
   });
 
@@ -58,7 +58,7 @@ describe("PdfStream", () => {
         Length: PdfNumber.of(42),
       });
 
-      expect(stream.getNumber("Length")).toBe(42);
+      expect(stream.getNumber("Length")?.value).toBe(42);
     });
   });
 
@@ -100,7 +100,7 @@ describe("PdfStream", () => {
 
       const stream = PdfStream.fromDict({ Length: PdfNumber.of(3) }, data);
 
-      expect(stream.getNumber("Length")).toBe(3);
+      expect(stream.getNumber("Length")?.value).toBe(3);
       expect(stream.data).toBe(data);
     });
   });

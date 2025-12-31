@@ -84,6 +84,7 @@ Prefer small, focused commits over large ones.
 - **Formatter/Linter**: Biome with 2-space indentation, double quotes
 - **Imports**: Use `#src/*` path alias for internal imports
 - **Tests**: Co-located as `*.test.ts` files
+- **No barrel files**: Avoid `index.ts` files that just re-export. Import directly from source files.
 
 ## Whitespace & Formatting
 

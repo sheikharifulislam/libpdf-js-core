@@ -118,8 +118,8 @@ describe("PdfDict", () => {
       expect(dict.getName("Missing")).toBeUndefined();
     });
 
-    it("getNumber() returns number value or undefined", () => {
-      expect(dict.getNumber("Count")).toBe(5);
+    it("getNumber() returns PdfNumber or undefined", () => {
+      expect(dict.getNumber("Count")?.value).toBe(5);
       expect(dict.getNumber("Type")).toBeUndefined(); // wrong type
     });
 
@@ -182,7 +182,7 @@ describe("PdfDict", () => {
       });
 
       expect(dict.get("Type")).toBe(PdfName.Page);
-      expect(dict.getNumber("Count")).toBe(3);
+      expect(dict.getNumber("Count")?.value).toBe(3);
     });
   });
 });

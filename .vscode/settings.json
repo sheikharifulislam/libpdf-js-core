@@ -5,7 +5,7 @@
 
   // Enable Biome code actions (linting fixes) on save
   "editor.codeActionsOnSave": {
-    "source.organizeImports.biome": "explicit",
+    "source.organizeImports.biome": "always",
     "source.fixAll.biome": "always"
   },
 
