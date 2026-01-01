@@ -1,6 +1,6 @@
+import { DIGIT_0, DIGIT_9, isDelimiter, isWhitespace } from "#src/helpers/chars";
 import type { Scanner } from "#src/io/scanner";
 import { PdfDict } from "#src/objects/pdf-dict";
-import { PdfName } from "#src/objects/pdf-name";
 import { PdfRef } from "#src/objects/pdf-ref";
 import { ObjectParser } from "./object-parser";
 import { TokenReader } from "./token-reader";
@@ -57,9 +57,6 @@ export interface RecoveredDocument {
   trailer: RecoveredTrailer;
   warnings: string[];
 }
-
-// PDF whitespace characters
-const WHITESPACE = new Set([0x00, 0x09, 0x0a, 0x0d, 0x0c, 0x20]);
 
 // Maximum reasonable object number
 const MAX_OBJ_NUM = 10_000_000;
@@ -152,15 +149,19 @@ export class BruteForceParser {
     const startPos = this.pos;
 
     // Must be at start of file or preceded by whitespace
-    if (startPos > 0 && !this.isWhitespace(this.data[startPos - 1])) {
+    if (startPos > 0 && !isWhitespace(this.data[startPos - 1])) {
       return null;
     }
 
     // Try to read: <number> <whitespace> <number> <whitespace> "obj"
     const objNum = this.tryReadInteger();
-    if (objNum === null) return null;
+    if (objNum === null) {
+      return null;
+    }
 
-    if (!this.skipWhitespace()) return null;
+    if (!this.skipWhitespace()) {
+      return null;
+    }
 
     const genNum = this.tryReadInteger();
     if (genNum === null) {
@@ -192,7 +193,7 @@ export class BruteForceParser {
     // Must be followed by whitespace or delimiter
     if (this.pos < this.data.length) {
       const next = this.data[this.pos];
-      if (!this.isWhitespace(next) && !this.isDelimiter(next)) {
+      if (!isWhitespace(next) && !isDelimiter(next)) {
         this.pos = startPos;
         return null;
       }
@@ -213,9 +214,8 @@ export class BruteForceParser {
     while (this.pos < this.data.length) {
       const byte = this.data[this.pos];
 
-      if (byte >= 0x30 && byte <= 0x39) {
-        // '0'-'9'
-        value = value * 10 + (byte - 0x30);
+      if (byte >= DIGIT_0 && byte <= DIGIT_9) {
+        value = value * 10 + (byte - DIGIT_0);
         hasDigits = true;
         this.pos++;
       } else {
@@ -234,32 +234,12 @@ export class BruteForceParser {
   private skipWhitespace(): boolean {
     let skipped = false;
 
-    while (this.pos < this.data.length && this.isWhitespace(this.data[this.pos])) {
+    while (this.pos < this.data.length && isWhitespace(this.data[this.pos])) {
       this.pos++;
       skipped = true;
     }
 
     return skipped;
-  }
-
-  private isWhitespace(byte: number): boolean {
-    return WHITESPACE.has(byte);
-  }
-
-  private isDelimiter(byte: number): boolean {
-    // PDF delimiters: ( ) < > [ ] { } / %
-    return (
-      byte === 0x28 || // (
-      byte === 0x29 || // )
-      byte === 0x3c || // <
-      byte === 0x3e || // >
-      byte === 0x5b || // [
-      byte === 0x5d || // ]
-      byte === 0x7b || // {
-      byte === 0x7d || // }
-      byte === 0x2f || // /
-      byte === 0x25 // %
-    );
   }
 
   private matchKeyword(keyword: string): boolean {
@@ -289,7 +269,9 @@ export class BruteForceParser {
       try {
         const dict = this.parseObjectAt(entry.offset, entry.objNum, entry.genNum);
 
-        if (dict === null) continue;
+        if (dict === null) {
+          continue;
+        }
 
         const type = dict.getName("Type");
 

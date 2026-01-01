@@ -8,6 +8,7 @@ import { applyPredictor } from "./predictor";
 function concat(chunks: Uint8Array[]): Uint8Array {
   const totalLength = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
   const result = new Uint8Array(totalLength);
+
   let offset = 0;
 
   for (const chunk of chunks) {
@@ -110,9 +111,11 @@ export class FlateFilter implements Filter {
     while (true) {
       const { done, value } = await reader.read();
 
-      if (done) break;
+      if (done) {
+        break;
+      }
 
-      chunks.push(new Uint8Array(value));
+      chunks.push(value);
     }
 
     return concat(chunks);

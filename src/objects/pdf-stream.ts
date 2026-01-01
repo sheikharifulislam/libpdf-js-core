@@ -1,4 +1,5 @@
-import { FilterPipeline, type FilterSpec } from "#src/filters";
+import type { FilterSpec } from "#src/filters/filter";
+import { FilterPipeline } from "#src/filters/filter-pipeline";
 import type { PdfObject } from "./object";
 import { PdfArray } from "./pdf-array";
 import { PdfDict } from "./pdf-dict";

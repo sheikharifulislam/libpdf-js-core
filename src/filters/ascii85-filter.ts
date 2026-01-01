@@ -1,3 +1,4 @@
+import { SINGLE_BYTE_MASK, SPACE } from "#src/helpers/chars.ts";
 import type { PdfDict } from "#src/objects/pdf-dict";
 import type { Filter } from "./filter";
 
@@ -16,8 +17,14 @@ import type { Filter } from "./filter";
 export class ASCII85Filter implements Filter {
   readonly name = "ASCII85Decode";
 
+  private static readonly END_MARKER = 0x7e;
+  private static readonly END_MARKER_FOLLOWING = 0x3e;
+
+  private static readonly ZERO_SHORTCUT = 0x7a;
+
   async decode(data: Uint8Array, _params?: PdfDict): Promise<Uint8Array> {
     const result: number[] = [];
+
     let buffer = 0;
     let count = 0;
 
@@ -25,12 +32,14 @@ export class ASCII85Filter implements Filter {
       const byte = data[i];
 
       // Skip whitespace
-      if (byte <= 0x20) continue;
+      if (byte <= SPACE) {
+        continue;
+      }
 
       // End marker '~>'
-      if (byte === 0x7e) {
+      if (byte === ASCII85Filter.END_MARKER) {
         // Check for '>' following
-        if (i + 1 < data.length && data[i + 1] === 0x3e) {
+        if (i + 1 < data.length && data[i + 1] === ASCII85Filter.END_MARKER_FOLLOWING) {
           break;
         }
         // Lone '~' - skip (lenient)
@@ -38,7 +47,7 @@ export class ASCII85Filter implements Filter {
       }
 
       // 'z' = shorthand for 4 zero bytes (only valid at group start)
-      if (byte === 0x7a) {
+      if (byte === ASCII85Filter.ZERO_SHORTCUT) {
         if (count !== 0) {
           // 'z' inside a group - invalid, but be lenient
           continue;
@@ -60,11 +69,12 @@ export class ASCII85Filter implements Filter {
       if (count === 5) {
         // Complete group - output 4 bytes
         result.push(
-          (buffer >> 24) & 0xff,
-          (buffer >> 16) & 0xff,
-          (buffer >> 8) & 0xff,
-          buffer & 0xff,
+          (buffer >> 24) & SINGLE_BYTE_MASK,
+          (buffer >> 16) & SINGLE_BYTE_MASK,
+          (buffer >> 8) & SINGLE_BYTE_MASK,
+          buffer & SINGLE_BYTE_MASK,
         );
+
         buffer = 0;
         count = 0;
       }
@@ -81,7 +91,7 @@ export class ASCII85Filter implements Filter {
       const outputBytes = count - 1;
 
       for (let i = 0; i < outputBytes; i++) {
-        result.push((buffer >> (24 - i * 8)) & 0xff);
+        result.push((buffer >> (24 - i * 8)) & SINGLE_BYTE_MASK);
       }
     }
 
@@ -103,7 +113,7 @@ export class ASCII85Filter implements Filter {
 
         if (value === 0) {
           // Special case: all zeros → 'z'
-          result.push(0x7a);
+          result.push(ASCII85Filter.ZERO_SHORTCUT);
         } else {
           // Encode as 5 base-85 digits
           this.encodeGroup(value, 5, result);
@@ -125,7 +135,7 @@ export class ASCII85Filter implements Filter {
     }
 
     // Add end marker '~>'
-    result.push(0x7e, 0x3e);
+    result.push(ASCII85Filter.END_MARKER, ASCII85Filter.END_MARKER_FOLLOWING);
 
     return new Uint8Array(result);
   }
@@ -139,6 +149,7 @@ export class ASCII85Filter implements Filter {
 
     for (let i = 4; i >= 0; i--) {
       digits[i] = (v % 85) + 33;
+
       v = Math.floor(v / 85);
     }
 

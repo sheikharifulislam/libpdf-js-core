@@ -89,7 +89,7 @@ function decodeTiffPredictor(
           // 16-bit addition with carry
           const prev = (output[pos - bytesPerPixel] << 8) | output[pos - bytesPerPixel + 1];
           const curr = (data[pos] << 8) | data[pos + 1];
-          const sum = (prev + curr) & 0xffff;
+          const sum = (prev + curr) & 0xff;
 
           output[pos] = (sum >> 8) & 0xff;
           output[pos + 1] = sum & 0xff;

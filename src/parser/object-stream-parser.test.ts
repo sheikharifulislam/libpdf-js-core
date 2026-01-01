@@ -25,7 +25,7 @@ function createObjectStream(objects: Array<{ objNum: number; text: string }>): P
     currentOffset += new TextEncoder().encode(text).length + 1;
   }
 
-  const indexSection = indexParts.join(" ") + "\n";
+  const indexSection = `${indexParts.join(" ")}\n`;
   const objectSection = objectParts.join("\n");
   const fullContent = indexSection + objectSection;
 

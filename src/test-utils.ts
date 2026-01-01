@@ -169,14 +169,18 @@ export function isPdfHeader(bytes: Uint8Array) {
  * @returns The version string (e.g., "1.4") or null if not found
  */
 export function getPdfVersion(bytes: Uint8Array) {
-  if (!isPdfHeader(bytes)) return null;
+  if (!isPdfHeader(bytes)) {
+    return null;
+  }
 
   // Find the newline after the header
   let end = 5;
 
   while (end < bytes.length && end < 20) {
     const b = bytes[end];
-    if (b === 0x0a || b === 0x0d) break;
+    if (b === 0x0a || b === 0x0d) {
+      break;
+    }
     end++;
   }
 

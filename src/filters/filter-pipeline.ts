@@ -1,5 +1,15 @@
 /** biome-ignore-all lint/complexity/noStaticOnlyClass: utility class */
+
+import { ASCIIHexFilter } from "./ascii-hex-filter";
+import { ASCII85Filter } from "./ascii85-filter";
+import { CCITTFaxFilter } from "./ccitt-fax-filter";
+import { DCTFilter } from "./dct-filter";
 import type { Filter, FilterSpec } from "./filter";
+import { FlateFilter } from "./flate-filter";
+import { JBIG2Filter } from "./jbig2-filter";
+import { JPXFilter } from "./jpx-filter";
+import { LZWFilter } from "./lzw-filter";
+import { RunLengthFilter } from "./run-length-filter";
 
 /**
  * Registry and executor for PDF stream filters.
@@ -122,3 +132,13 @@ export class FilterPipeline {
     FilterPipeline.filters.clear();
   }
 }
+
+FilterPipeline.register(new FlateFilter());
+FilterPipeline.register(new LZWFilter());
+FilterPipeline.register(new ASCIIHexFilter());
+FilterPipeline.register(new ASCII85Filter());
+FilterPipeline.register(new RunLengthFilter());
+FilterPipeline.register(new DCTFilter());
+FilterPipeline.register(new CCITTFaxFilter());
+FilterPipeline.register(new JBIG2Filter());
+FilterPipeline.register(new JPXFilter());

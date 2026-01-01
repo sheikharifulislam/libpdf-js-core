@@ -1,3 +1,31 @@
+import {
+  ANGLE_BRACKET_CLOSE,
+  ANGLE_BRACKET_OPEN,
+  BACKSLASH,
+  BS,
+  CHAR_HASH,
+  CHAR_MINUS,
+  CHAR_PERIOD,
+  CHAR_PLUS,
+  CR,
+  DIGIT_0,
+  DIGIT_9,
+  FF,
+  hexValue,
+  isDigit,
+  isHexDigit,
+  isRegularChar,
+  LF,
+  PARENTHESIS_CLOSE,
+  PARENTHESIS_OPEN,
+  PERCENT,
+  SINGLE_BYTE_MASK,
+  SLASH,
+  SQUARE_BRACKET_CLOSE,
+  SQUARE_BRACKET_OPEN,
+  TAB,
+  WHITESPACE,
+} from "#src/helpers/chars";
 import type { Scanner } from "#src/io/scanner";
 import type {
   DelimiterToken,
@@ -7,34 +35,6 @@ import type {
   StringToken,
   Token,
 } from "./token";
-
-/**
- * PDF whitespace characters (PDF spec 7.2.2)
- */
-const WHITESPACE = new Set([
-  0x00, // NUL
-  0x09, // TAB
-  0x0a, // LF
-  0x0d, // CR
-  0x0c, // FF
-  0x20, // SPACE
-]);
-
-/**
- * PDF delimiter characters (PDF spec 7.2.2)
- */
-const DELIMITERS = new Set([
-  0x28, // (
-  0x29, // )
-  0x3c, // <
-  0x3e, // >
-  0x5b, // [
-  0x5d, // ]
-  0x7b, // {
-  0x7d, // }
-  0x2f, // /
-  0x25, // %
-]);
 
 /**
  * On-demand tokenizer for PDF syntax.
@@ -94,7 +94,7 @@ export class TokenReader {
       }
 
       // Comment: % to end of line
-      if (byte === 0x25) {
+      if (byte === PERCENT) {
         this.scanner.advance();
         this.skipToEndOfLine();
         continue;
@@ -117,7 +117,7 @@ export class TokenReader {
     while (true) {
       const byte = this.scanner.peek();
 
-      if (byte === -1 || byte === 0x0a || byte === 0x0d) {
+      if (byte === -1 || byte === LF || byte === CR) {
         return;
       }
 
@@ -136,33 +136,33 @@ export class TokenReader {
     }
 
     // Name: /...
-    if (byte === 0x2f) {
+    if (byte === SLASH) {
       return this.readName(position);
     }
 
     // Literal string: (...)
-    if (byte === 0x28) {
+    if (byte === PARENTHESIS_OPEN) {
       return this.readLiteralString(position);
     }
 
     // Hex string or dict delimiter: < or <<
-    if (byte === 0x3c) {
+    if (byte === ANGLE_BRACKET_OPEN) {
       return this.readAngleBracket(position);
     }
 
     // Dict end or unexpected >
-    if (byte === 0x3e) {
+    if (byte === ANGLE_BRACKET_CLOSE) {
       return this.readClosingAngle(position);
     }
 
     // Array delimiters
-    if (byte === 0x5b) {
+    if (byte === SQUARE_BRACKET_OPEN) {
       this.scanner.advance();
 
       return { type: "delimiter", value: "[", position };
     }
 
-    if (byte === 0x5d) {
+    if (byte === SQUARE_BRACKET_CLOSE) {
       this.scanner.advance();
 
       return { type: "delimiter", value: "]", position };
@@ -179,19 +179,11 @@ export class TokenReader {
 
   private isNumberStart(byte: number): boolean {
     return (
-      (byte >= 0x30 && byte <= 0x39) || // 0-9
-      byte === 0x2b || // +
-      byte === 0x2d || // -
-      byte === 0x2e // .
+      (byte >= DIGIT_0 && byte <= DIGIT_9) || // 0-9
+      byte === CHAR_PLUS || // +
+      byte === CHAR_MINUS || // -
+      byte === CHAR_PERIOD // .
     );
-  }
-
-  private isDigit(byte: number): boolean {
-    return byte >= 0x30 && byte <= 0x39;
-  }
-
-  private isRegularChar(byte: number): boolean {
-    return byte !== -1 && !WHITESPACE.has(byte) && !DELIMITERS.has(byte);
   }
 
   private readNumber(position: number): NumberToken | KeywordToken {
@@ -203,16 +195,16 @@ export class TokenReader {
     // Handle leading sign
     const firstByte = this.scanner.peek();
 
-    if (firstByte === 0x2b || firstByte === 0x2d) {
-      isNegative = firstByte === 0x2d;
+    if (firstByte === CHAR_PLUS || firstByte === CHAR_MINUS) {
+      isNegative = firstByte === CHAR_MINUS;
       this.scanner.advance();
 
       // Handle double negative (lenient) - if multiple negatives, ignore all
       // This matches PDFBox behavior: --5 → 5, ---5 → 5
-      if (this.scanner.peek() === 0x2d) {
+      if (this.scanner.peek() === CHAR_MINUS) {
         isNegative = false;
 
-        while (this.scanner.peek() === 0x2d) {
+        while (this.scanner.peek() === CHAR_MINUS) {
           this.scanner.advance();
         }
       }
@@ -222,7 +214,7 @@ export class TokenReader {
     const digitsStart = this.scanner.position;
 
     // Handle leading decimal
-    if (this.scanner.peek() === 0x2e) {
+    if (this.scanner.peek() === CHAR_PERIOD) {
       hasDecimal = true;
       this.scanner.advance();
     }
@@ -231,13 +223,13 @@ export class TokenReader {
     while (true) {
       const byte = this.scanner.peek();
 
-      if (this.isDigit(byte)) {
+      if (isDigit(byte)) {
         hasDigit = true;
         this.scanner.advance();
         continue;
       }
 
-      if (byte === 0x2e && !hasDecimal) {
+      if (byte === CHAR_PERIOD && !hasDecimal) {
         hasDecimal = true;
         this.scanner.advance();
         continue;
@@ -248,7 +240,7 @@ export class TokenReader {
 
     // Read any trailing digits after decimal
     if (hasDecimal) {
-      while (this.isDigit(this.scanner.peek())) {
+      while (isDigit(this.scanner.peek())) {
         hasDigit = true;
         this.scanner.advance();
       }
@@ -259,7 +251,7 @@ export class TokenReader {
     // If we didn't get any digits, this might be a keyword starting with +/-/.
     if (!hasDigit) {
       // Read rest as keyword
-      while (this.isRegularChar(this.scanner.peek())) {
+      while (isRegularChar(this.scanner.peek())) {
         this.scanner.advance();
       }
 
@@ -290,38 +282,38 @@ export class TokenReader {
     while (true) {
       const byte = this.scanner.peek();
 
-      if (!this.isRegularChar(byte)) {
+      if (!isRegularChar(byte)) {
         break;
       }
 
       this.scanner.advance();
 
       // Handle # hex escape
-      if (byte === 0x23) {
+      if (byte === CHAR_HASH) {
         const hex1 = this.scanner.peek();
 
-        if (this.isHexDigit(hex1)) {
+        if (isHexDigit(hex1)) {
           this.scanner.advance();
 
           const hex2 = this.scanner.peek();
 
-          if (this.isHexDigit(hex2)) {
+          if (isHexDigit(hex2)) {
             this.scanner.advance();
 
-            const value = (this.hexValue(hex1) << 4) | this.hexValue(hex2);
+            const value = (hexValue(hex1) << 4) | hexValue(hex2);
 
             bytes.push(value);
             continue;
           }
 
           // Lone hex digit after # - treat literally
-          bytes.push(0x23);
+          bytes.push(CHAR_HASH);
           bytes.push(hex1);
           continue;
         }
 
         // Lone # - treat literally
-        bytes.push(0x23);
+        bytes.push(CHAR_HASH);
         continue;
       }
 
@@ -350,14 +342,14 @@ export class TokenReader {
 
       this.scanner.advance();
 
-      if (byte === 0x28) {
+      if (byte === PARENTHESIS_OPEN) {
         // Nested (
         parenDepth++;
         bytes.push(byte);
         continue;
       }
 
-      if (byte === 0x29) {
+      if (byte === PARENTHESIS_CLOSE) {
         // Closing )
         parenDepth--;
 
@@ -368,7 +360,7 @@ export class TokenReader {
         continue;
       }
 
-      if (byte === 0x5c) {
+      if (byte === BACKSLASH) {
         // Escape sequence
         const escaped = this.readEscapeSequence();
 
@@ -384,13 +376,13 @@ export class TokenReader {
       }
 
       // Normalize line endings to LF
-      if (byte === 0x0d) {
+      if (byte === CR) {
         // Check for CRLF
-        if (this.scanner.peek() === 0x0a) {
+        if (this.scanner.peek() === LF) {
           this.scanner.advance();
         }
 
-        bytes.push(0x0a);
+        bytes.push(LF);
         continue;
       }
 
@@ -416,34 +408,34 @@ export class TokenReader {
 
     switch (byte) {
       case 0x6e:
-        return 0x0a; // \n -> LF
+        return LF; // \n -> LF
       case 0x72:
-        return 0x0d; // \r -> CR
+        return CR; // \r -> CR
       case 0x74:
-        return 0x09; // \t -> TAB
+        return TAB; // \t -> TAB
       case 0x62:
-        return 0x08; // \b -> BS
+        return BS; // \b -> BS
       case 0x66:
-        return 0x0c; // \f -> FF
-      case 0x28:
-        return 0x28; // \( -> (
-      case 0x29:
-        return 0x29; // \) -> )
-      case 0x5c:
-        return 0x5c; // \\ -> \
-      case 0x0d:
+        return FF; // \f -> FF
+      case PARENTHESIS_OPEN:
+        return PARENTHESIS_OPEN; // \( -> (
+      case PARENTHESIS_CLOSE:
+        return PARENTHESIS_CLOSE; // \) -> )
+      case BACKSLASH:
+        return BACKSLASH; // \\ -> \
+      case CR:
         // Line continuation: \ at end of line
-        if (this.scanner.peek() === 0x0a) {
+        if (this.scanner.peek() === LF) {
           this.scanner.advance();
         }
 
         return null;
-      case 0x0a:
+      case LF:
         // Line continuation
         return null;
       default:
         // Check for octal
-        if (byte >= 0x30 && byte <= 0x37) {
+        if (byte >= DIGIT_0 && byte <= 0x37) {
           return this.readOctalEscape(byte);
         }
 
@@ -453,30 +445,30 @@ export class TokenReader {
   }
 
   private readOctalEscape(firstDigit: number): number {
-    let value = firstDigit - 0x30;
+    let value = firstDigit - DIGIT_0;
     let digits = 1;
 
     while (digits < 3) {
       const byte = this.scanner.peek();
 
-      if (byte < 0x30 || byte > 0x37) {
+      if (byte < DIGIT_0 || byte > 0x37) {
         break;
       }
 
       this.scanner.advance();
 
-      value = (value << 3) | (byte - 0x30);
+      value = (value << 3) | (byte - DIGIT_0);
       digits++;
     }
 
-    return value & 0xff;
+    return value & SINGLE_BYTE_MASK;
   }
 
   private readAngleBracket(position: number): StringToken | DelimiterToken {
     this.scanner.advance(); // Skip first <
 
     // Check for <<
-    if (this.scanner.peek() === 0x3c) {
+    if (this.scanner.peek() === ANGLE_BRACKET_OPEN) {
       this.scanner.advance();
 
       return { type: "delimiter", value: "<<", position };
@@ -493,9 +485,9 @@ export class TokenReader {
     while (true) {
       const byte = this.scanner.peek();
 
-      if (byte === -1 || byte === 0x3e) {
+      if (byte === -1 || byte === ANGLE_BRACKET_CLOSE) {
         // EOF or >
-        if (byte === 0x3e) {
+        if (byte === ANGLE_BRACKET_CLOSE) {
           this.scanner.advance();
         }
 
@@ -509,8 +501,8 @@ export class TokenReader {
         continue;
       }
 
-      if (this.isHexDigit(byte)) {
-        const nibble = this.hexValue(byte);
+      if (isHexDigit(byte)) {
+        const nibble = hexValue(byte);
 
         if (pendingNibble === null) {
           pendingNibble = nibble;
@@ -541,7 +533,7 @@ export class TokenReader {
     this.scanner.advance(); // Skip first >
 
     // Check for >>
-    if (this.scanner.peek() === 0x3e) {
+    if (this.scanner.peek() === ANGLE_BRACKET_CLOSE) {
       this.scanner.advance();
 
       return { type: "delimiter", value: ">>", position };
@@ -555,33 +547,13 @@ export class TokenReader {
   private readKeyword(position: number): KeywordToken {
     const start = this.scanner.position;
 
-    while (this.isRegularChar(this.scanner.peek())) {
+    while (isRegularChar(this.scanner.peek())) {
       this.scanner.advance();
     }
 
     const value = this.extractText(start, this.scanner.position);
 
     return { type: "keyword", value, position };
-  }
-
-  private isHexDigit(byte: number): boolean {
-    return (
-      (byte >= 0x30 && byte <= 0x39) || // 0-9
-      (byte >= 0x41 && byte <= 0x46) || // A-F
-      (byte >= 0x61 && byte <= 0x66) // a-f
-    );
-  }
-
-  private hexValue(byte: number): number {
-    if (byte >= 0x30 && byte <= 0x39) {
-      return byte - 0x30;
-    }
-
-    if (byte >= 0x41 && byte <= 0x46) {
-      return byte - 0x41 + 10;
-    }
-
-    return byte - 0x61 + 10;
   }
 
   private extractText(start: number, end: number): string {

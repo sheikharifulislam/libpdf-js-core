@@ -44,7 +44,9 @@ export class JPXFilter implements Filter {
    * - JP2 file: 00 00 00 0C 6A 50 20 20 (signature box)
    */
   private isJPEG2000(data: Uint8Array): boolean {
-    if (data.length < 2) return false;
+    if (data.length < 2) {
+      return false;
+    }
 
     // Check for codestream SOC marker
     if (data[0] === 0xff && data[1] === 0x4f) {
@@ -56,7 +58,9 @@ export class JPXFilter implements Filter {
       const sig = [0x00, 0x00, 0x00, 0x0c, 0x6a, 0x50, 0x20, 0x20];
 
       for (let i = 0; i < 8; i++) {
-        if (data[i] !== sig[i]) return false;
+        if (data[i] !== sig[i]) {
+          return false;
+        }
       }
 
       return true;

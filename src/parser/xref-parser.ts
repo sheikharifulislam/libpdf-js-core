@@ -1,3 +1,4 @@
+import { CR, DIGIT_0, DIGIT_9, LF, SPACE, TAB } from "#src/helpers/chars";
 import type { Scanner } from "#src/io/scanner";
 import type { PdfDict } from "#src/objects/pdf-dict";
 import { ObjectParser } from "./object-parser";
@@ -20,12 +21,7 @@ export interface XRefData {
   prev?: number;
 }
 
-// ASCII codes
-const LF = 0x0a;
-const CR = 0x0d;
-const SPACE = 0x20;
-const CHAR_0 = 0x30;
-const CHAR_9 = 0x39;
+// ASCII codes for xref-specific parsing
 const CHAR_f = 0x66;
 const CHAR_n = 0x6e;
 
@@ -93,7 +89,7 @@ export class XRefParser {
     }
 
     // Digit starts "N M obj" (stream format)
-    if (firstByte >= CHAR_0 && firstByte <= CHAR_9) {
+    if (firstByte >= DIGIT_0 && firstByte <= DIGIT_9) {
       return this.parseStream();
     }
 
@@ -227,11 +223,11 @@ export class XRefParser {
     for (let i = 0; i < count; i++) {
       const byte = this.scanner.peek();
 
-      if (byte < CHAR_0 || byte > CHAR_9) {
+      if (byte < DIGIT_0 || byte > DIGIT_9) {
         throw new Error(`Expected digit, got ${String.fromCharCode(byte)}`);
       }
 
-      value = value * 10 + (byte - CHAR_0);
+      value = value * 10 + (byte - DIGIT_0);
       this.scanner.advance();
     }
 
@@ -290,7 +286,7 @@ export class XRefParser {
         break;
       }
 
-      if (byte === SPACE || byte === LF || byte === CR || byte === 0x09) {
+      if (byte === SPACE || byte === LF || byte === CR || byte === TAB) {
         this.scanner.advance();
       } else {
         break;
@@ -322,7 +318,7 @@ export class XRefParser {
     while (pos < bytes.length) {
       const byte = bytes[pos];
 
-      if (byte === SPACE || byte === LF || byte === CR || byte === 0x09) {
+      if (byte === SPACE || byte === LF || byte === CR || byte === TAB) {
         pos++;
       } else {
         break;
@@ -343,8 +339,8 @@ export class XRefParser {
     while (pos < bytes.length) {
       const byte = bytes[pos];
 
-      if (byte >= CHAR_0 && byte <= CHAR_9) {
-        value = value * 10 + (byte - CHAR_0);
+      if (byte >= DIGIT_0 && byte <= DIGIT_9) {
+        value = value * 10 + (byte - DIGIT_0);
         hasDigits = true;
         pos++;
       } else {
@@ -365,8 +361,8 @@ export class XRefParser {
     while (true) {
       const byte = this.scanner.peek();
 
-      if (byte >= CHAR_0 && byte <= CHAR_9) {
-        value = value * 10 + (byte - CHAR_0);
+      if (byte >= DIGIT_0 && byte <= DIGIT_9) {
+        value = value * 10 + (byte - DIGIT_0);
         hasDigits = true;
         this.scanner.advance();
       } else {

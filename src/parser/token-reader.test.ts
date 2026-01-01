@@ -973,7 +973,9 @@ describe("TokenReader", () => {
 
         tokens.push(token);
 
-        if (token.type === "eof") break;
+        if (token.type === "eof") {
+          break;
+        }
       }
 
       expect(tokens.map(t => t.type)).toEqual([
@@ -1027,7 +1029,9 @@ describe("TokenReader", () => {
 
         tokens.push(token);
 
-        if (token.type === "eof") break;
+        if (token.type === "eof") {
+          break;
+        }
       }
 
       expect(tokens.map(t => t.type)).toEqual([

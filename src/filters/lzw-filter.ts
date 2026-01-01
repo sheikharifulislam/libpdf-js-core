@@ -16,6 +16,9 @@ import { applyPredictor } from "./predictor";
 export class LZWFilter implements Filter {
   readonly name = "LZWDecode";
 
+  private static readonly CLEAR_CODE = 256;
+  private static readonly EOD_CODE = 257;
+
   async decode(data: Uint8Array, params?: PdfDict): Promise<Uint8Array> {
     const earlyChange = params?.getNumber("EarlyChange")?.value ?? 1;
     const result = this.lzwDecode(data, earlyChange);
@@ -41,9 +44,6 @@ export class LZWFilter implements Filter {
     const output: number[] = [];
 
     // LZW constants
-    const CLEAR_CODE = 256;
-    const EOD_CODE = 257;
-
     // Bit reading state
     let bitPos = 0;
     let codeLength = 9;
@@ -70,7 +70,7 @@ export class LZWFilter implements Filter {
         const byteIndex = Math.floor(bitOffset / 8);
 
         if (byteIndex >= data.length) {
-          return EOD_CODE; // Premature end
+          return LZWFilter.EOD_CODE; // Premature end
         }
 
         const byte = data[byteIndex];
@@ -96,11 +96,11 @@ export class LZWFilter implements Filter {
     while (true) {
       const code = readCode();
 
-      if (code === EOD_CODE) {
+      if (code === LZWFilter.EOD_CODE) {
         break;
       }
 
-      if (code === CLEAR_CODE) {
+      if (code === LZWFilter.CLEAR_CODE) {
         // Reset dictionary
         dictionary.length = 258;
         codeLength = 9;

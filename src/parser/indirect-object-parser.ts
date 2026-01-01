@@ -1,3 +1,4 @@
+import { CR, LF, SPACE, TAB } from "#src/helpers/chars";
 import type { Scanner } from "#src/io/scanner";
 import type { PdfObject } from "#src/objects/object";
 import type { PdfDict } from "#src/objects/pdf-dict";
@@ -20,10 +21,6 @@ export interface IndirectObject {
  * Returns the length value, or null if not resolvable.
  */
 export type LengthResolver = (ref: PdfRef) => number | null;
-
-// ASCII codes
-const LF = 0x0a;
-const CR = 0x0d;
 
 /**
  * Parser for indirect object definitions.
@@ -172,8 +169,10 @@ export class IndirectObjectParser {
     while (true) {
       const byte = this.scanner.peek();
 
-      if (byte === -1) break;
-      if (byte === 0x20 || byte === 0x09 || byte === LF || byte === CR) {
+      if (byte === -1) {
+        break;
+      }
+      if (byte === SPACE || byte === TAB || byte === LF || byte === CR) {
         this.scanner.advance();
       } else {
         break;

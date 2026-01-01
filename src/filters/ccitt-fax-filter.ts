@@ -141,7 +141,9 @@ export class CCITTFaxFilter implements Filter {
           }
         }
 
-        if (!found) break;
+        if (!found) {
+          break;
+        }
       }
 
       // Then, get terminating code (length < 64)

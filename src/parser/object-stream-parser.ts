@@ -88,8 +88,12 @@ export class ObjectStreamParser {
   private parseIndex(): ObjectStreamEntry[] {
     const result: ObjectStreamEntry[] = [];
 
+    if (this.decodedData === null) {
+      throw new Error("Decoded data not parsed");
+    }
+
     // Create scanner for the index portion only
-    const indexData = this.decodedData!.subarray(0, this.first);
+    const indexData = this.decodedData.subarray(0, this.first);
     const scanner = new Scanner(indexData);
     const reader = new TokenReader(scanner);
 
@@ -127,14 +131,22 @@ export class ObjectStreamParser {
   async getObject(index: number): Promise<PdfObject | null> {
     await this.parse();
 
-    if (index < 0 || index >= this.index!.length) {
+    if (this.index === null) {
+      throw new Error("Index not parsed");
+    }
+
+    if (index < 0 || index >= this.index.length) {
       return null;
     }
 
-    const entry = this.index![index];
+    const entry = this.index[index];
+
+    if (this.decodedData === null) {
+      throw new Error("Decoded data not parsed");
+    }
 
     // Create scanner starting at the object's offset within the object section
-    const objectSection = this.decodedData!.subarray(this.first);
+    const objectSection = this.decodedData.subarray(this.first);
     const scanner = new Scanner(objectSection);
 
     scanner.moveTo(entry.offset);
@@ -155,13 +167,17 @@ export class ObjectStreamParser {
   async getAllObjects(): Promise<Map<number, PdfObject>> {
     await this.parse();
 
+    if (this.index === null) {
+      throw new Error("Index not parsed");
+    }
+
     const result = new Map<number, PdfObject>();
 
-    for (let i = 0; i < this.index!.length; i++) {
+    for (let i = 0; i < this.index.length; i++) {
       const obj = await this.getObject(i);
 
       if (obj !== null) {
-        result.set(this.index![i].objNum, obj);
+        result.set(this.index[i].objNum, obj);
       }
     }
 

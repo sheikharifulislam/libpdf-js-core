@@ -109,7 +109,11 @@ export class ObjectParser {
   }
 
   private parseValue(): ParseResult {
-    const token = this.buf1!;
+    const token = this.buf1;
+
+    if (token === null) {
+      throw new Error("Unexpected null token");
+    }
 
     switch (token.type) {
       case "keyword":
