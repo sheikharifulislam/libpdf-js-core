@@ -3,34 +3,18 @@
  *
  * Supports both full save (rewrite everything) and incremental save
  * (append only changed objects).
+ *
+ * Uses a single ByteWriter for the entire PDF to minimize allocations.
  */
 
 import { clearAllDirtyFlags, collectChanges } from "#src/document/change-collector";
 import type { ObjectRegistry } from "#src/document/object-registry";
-import type { PdfObject } from "#src/objects/object";
+import { CR, LF } from "#src/helpers/chars.ts";
+import { ByteWriter } from "#src/io/byte-writer";
+import type { PdfObject } from "#src/objects/pdf-object.ts";
+import type { PdfPrimitive } from "#src/objects/pdf-primitive";
 import type { PdfRef } from "#src/objects/pdf-ref";
-import { serializeIndirectObject } from "./serializer";
 import { writeXRefStream, writeXRefTable, type XRefWriteEntry } from "./xref-writer";
-
-const textEncoder = new TextEncoder();
-
-function encode(str: string): Uint8Array {
-  return textEncoder.encode(str);
-}
-
-function concat(...arrays: Uint8Array[]): Uint8Array {
-  const totalLength = arrays.reduce((sum, arr) => sum + arr.length, 0);
-  const result = new Uint8Array(totalLength);
-
-  let offset = 0;
-
-  for (const arr of arrays) {
-    result.set(arr, offset);
-    offset += arr.length;
-  }
-
-  return result;
-}
 
 /**
  * Options for PDF writing.
@@ -78,6 +62,17 @@ export interface WriteResult {
 }
 
 /**
+ * Write an indirect object to the ByteWriter.
+ *
+ * Format: "N G obj\n[object]\nendobj\n"
+ */
+function writeIndirectObject(writer: ByteWriter, ref: PdfRef, obj: PdfObject): void {
+  writer.writeAscii(`${ref.objectNumber} ${ref.generation} obj\n`);
+  obj.toBytes(writer);
+  writer.writeAscii("\nendobj\n");
+}
+
+/**
  * Write a complete PDF from scratch.
  *
  * Structure:
@@ -99,16 +94,15 @@ export interface WriteResult {
  * ```
  */
 export function writeComplete(registry: ObjectRegistry, options: WriteOptions): WriteResult {
-  const parts: Uint8Array[] = [];
+  const writer = new ByteWriter();
 
   // Version
   const version = options.version ?? "1.7";
-
-  parts.push(encode(`%PDF-${version}\n`));
+  writer.writeAscii(`%PDF-${version}\n`);
 
   // Binary comment (signals binary file to text tools)
   // Use high-byte characters as recommended by PDF spec
-  parts.push(new Uint8Array([0x25, 0xe2, 0xe3, 0xcf, 0xd3, 0x0a])); // %âãÏÓ\n
+  writer.writeBytes(new Uint8Array([0x25, 0xe2, 0xe3, 0xcf, 0xd3, 0x0a])); // %âãÏÓ\n
 
   // Track offsets for xref
   const offsets = new Map<number, { offset: number; generation: number }>();
@@ -121,22 +115,17 @@ export function writeComplete(registry: ObjectRegistry, options: WriteOptions): 
   }
 
   // Write objects and record offsets
-  let currentOffset = parts.reduce((sum, p) => sum + p.length, 0);
-
   for (const [ref, obj] of allObjects) {
     offsets.set(ref.objectNumber, {
-      offset: currentOffset,
+      offset: writer.position,
       generation: ref.generation,
     });
 
-    const objBytes = serializeIndirectObject(ref, obj);
-
-    parts.push(objBytes);
-    currentOffset += objBytes.length;
+    writeIndirectObject(writer, ref, obj);
   }
 
   // Record xref offset before writing it
-  const xrefOffset = currentOffset;
+  const xrefOffset = writer.position;
 
   // Build xref entries
   const entries: XRefWriteEntry[] = [
@@ -161,7 +150,7 @@ export function writeComplete(registry: ObjectRegistry, options: WriteOptions): 
     // XRef stream needs its own object number
     const xrefObjNum = registry.nextObjectNumber;
 
-    const { bytes: xrefBytes } = writeXRefStream({
+    writeXRefStream(writer, {
       entries,
       size: size + 1, // Include xref stream itself
       xrefOffset,
@@ -171,10 +160,8 @@ export function writeComplete(registry: ObjectRegistry, options: WriteOptions): 
       id: options.id,
       streamObjectNumber: xrefObjNum,
     });
-
-    parts.push(xrefBytes);
   } else {
-    const xrefBytes = writeXRefTable({
+    writeXRefTable(writer, {
       entries,
       size,
       xrefOffset,
@@ -183,12 +170,10 @@ export function writeComplete(registry: ObjectRegistry, options: WriteOptions): 
       encrypt: options.encrypt,
       id: options.id,
     });
-
-    parts.push(xrefBytes);
   }
 
   return {
-    bytes: concat(...parts),
+    bytes: writer.toBytes(),
     xrefOffset,
   };
 }
@@ -229,20 +214,15 @@ export function writeIncremental(
     };
   }
 
-  const parts: Uint8Array[] = [];
-
-  // Start with original bytes
-  parts.push(options.originalBytes);
+  // Initialize ByteWriter with original bytes
+  const writer = new ByteWriter(options.originalBytes);
 
   // Ensure there's a newline before appended content
   const lastByte = options.originalBytes[options.originalBytes.length - 1];
 
-  if (lastByte !== 0x0a && lastByte !== 0x0d) {
-    parts.push(encode("\n"));
+  if (lastByte !== LF && lastByte !== CR) {
+    writer.writeByte(0x0a); // newline
   }
-
-  // Track current offset (after original bytes + potential newline)
-  let currentOffset = parts.reduce((sum, p) => sum + p.length, 0);
 
   // Track offsets for new xref
   const offsets = new Map<number, { offset: number; generation: number }>();
@@ -250,31 +230,25 @@ export function writeIncremental(
   // Write modified objects
   for (const [ref, obj] of changes.modified) {
     offsets.set(ref.objectNumber, {
-      offset: currentOffset,
+      offset: writer.position,
       generation: ref.generation,
     });
 
-    const objBytes = serializeIndirectObject(ref, obj);
-
-    parts.push(objBytes);
-    currentOffset += objBytes.length;
+    writeIndirectObject(writer, ref, obj);
   }
 
   // Write new objects
   for (const [ref, obj] of changes.created) {
     offsets.set(ref.objectNumber, {
-      offset: currentOffset,
+      offset: writer.position,
       generation: ref.generation,
     });
 
-    const objBytes = serializeIndirectObject(ref, obj);
-
-    parts.push(objBytes);
-    currentOffset += objBytes.length;
+    writeIndirectObject(writer, ref, obj);
   }
 
   // Record xref offset
-  const xrefOffset = currentOffset;
+  const xrefOffset = writer.position;
 
   // Build xref entries (only for changed objects)
   const entries: XRefWriteEntry[] = [];
@@ -295,7 +269,7 @@ export function writeIncremental(
   if (options.useXRefStream) {
     const xrefObjNum = registry.nextObjectNumber;
 
-    const { bytes: xrefBytes } = writeXRefStream({
+    writeXRefStream(writer, {
       entries,
       size,
       xrefOffset,
@@ -306,10 +280,8 @@ export function writeIncremental(
       id: options.id,
       streamObjectNumber: xrefObjNum,
     });
-
-    parts.push(xrefBytes);
   } else {
-    const xrefBytes = writeXRefTable({
+    writeXRefTable(writer, {
       entries,
       size,
       xrefOffset,
@@ -319,8 +291,6 @@ export function writeIncremental(
       encrypt: options.encrypt,
       id: options.id,
     });
-
-    parts.push(xrefBytes);
   }
 
   // Clear dirty flags and commit new objects
@@ -328,7 +298,7 @@ export function writeIncremental(
   registry.commitNewObjects();
 
   return {
-    bytes: concat(...parts),
+    bytes: writer.toBytes(),
     xrefOffset,
   };
 }

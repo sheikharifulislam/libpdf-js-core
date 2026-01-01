@@ -1,10 +1,10 @@
-import type { PdfObject } from "#src/objects/object";
 import { PdfArray } from "#src/objects/pdf-array";
 import { PdfBool } from "#src/objects/pdf-bool";
 import { PdfDict } from "#src/objects/pdf-dict";
 import { PdfName } from "#src/objects/pdf-name";
 import { PdfNull } from "#src/objects/pdf-null";
 import { PdfNumber } from "#src/objects/pdf-number";
+import type { PdfObject } from "#src/objects/pdf-object.ts";
 import { PdfRef } from "#src/objects/pdf-ref";
 import { PdfString } from "#src/objects/pdf-string";
 import { ObjectParseError } from "./errors";

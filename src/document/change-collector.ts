@@ -6,9 +6,9 @@
  * cost paid only when saving.
  */
 
-import type { PdfObject } from "#src/objects/object";
 import { PdfArray } from "#src/objects/pdf-array";
 import { PdfDict } from "#src/objects/pdf-dict";
+import type { PdfObject } from "#src/objects/pdf-object.ts";
 import { PdfRef } from "#src/objects/pdf-ref";
 import type { ObjectRegistry } from "./object-registry";
 

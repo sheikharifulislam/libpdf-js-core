@@ -1,4 +1,10 @@
 import { describe, expect, it } from "vitest";
+import { PdfArray } from "./pdf-array";
+import { PdfBool } from "./pdf-bool";
+import { PdfDict } from "./pdf-dict";
+import { PdfName } from "./pdf-name";
+import { PdfNull } from "./pdf-null";
+import { PdfNumber } from "./pdf-number";
 import {
   isPdfArray,
   isPdfBool,
@@ -10,13 +16,7 @@ import {
   isPdfStream,
   isPdfString,
   type PdfObject,
-} from "./object";
-import { PdfArray } from "./pdf-array";
-import { PdfBool } from "./pdf-bool";
-import { PdfDict } from "./pdf-dict";
-import { PdfName } from "./pdf-name";
-import { PdfNull } from "./pdf-null";
-import { PdfNumber } from "./pdf-number";
+} from "./pdf-object";
 import { PdfRef } from "./pdf-ref";
 import { PdfStream } from "./pdf-stream";
 import { PdfString } from "./pdf-string";

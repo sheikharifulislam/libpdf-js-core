@@ -10,6 +10,7 @@
  */
 
 import { md5 } from "@noble/hashes/legacy.js";
+import { SINGLE_BYTE_MASK } from "#src/helpers/chars.ts";
 import { RC4Cipher } from "../ciphers/rc4";
 
 /**
@@ -86,10 +87,10 @@ export function computeEncryptionKeyR2R4(
   offset += 32;
 
   // Step c: Append P value (4 bytes, little-endian)
-  hashInput[offset++] = permissions & 0xff;
-  hashInput[offset++] = (permissions >> 8) & 0xff;
-  hashInput[offset++] = (permissions >> 16) & 0xff;
-  hashInput[offset++] = (permissions >> 24) & 0xff;
+  hashInput[offset++] = permissions & SINGLE_BYTE_MASK;
+  hashInput[offset++] = (permissions >> 8) & SINGLE_BYTE_MASK;
+  hashInput[offset++] = (permissions >> 16) & SINGLE_BYTE_MASK;
+  hashInput[offset++] = (permissions >> 24) & SINGLE_BYTE_MASK;
 
   // Step d: Append first element of file ID
   hashInput.set(fileId, offset);
@@ -379,13 +380,13 @@ export function deriveObjectKey(
   offset += documentKey.length;
 
   // Append object number (3 bytes, little-endian)
-  hashInput[offset++] = objectNumber & 0xff;
-  hashInput[offset++] = (objectNumber >> 8) & 0xff;
-  hashInput[offset++] = (objectNumber >> 16) & 0xff;
+  hashInput[offset++] = objectNumber & SINGLE_BYTE_MASK;
+  hashInput[offset++] = (objectNumber >> 8) & SINGLE_BYTE_MASK;
+  hashInput[offset++] = (objectNumber >> 16) & SINGLE_BYTE_MASK;
 
   // Append generation number (2 bytes, little-endian)
-  hashInput[offset++] = generationNumber & 0xff;
-  hashInput[offset++] = (generationNumber >> 8) & 0xff;
+  hashInput[offset++] = generationNumber & SINGLE_BYTE_MASK;
+  hashInput[offset++] = (generationNumber >> 8) & SINGLE_BYTE_MASK;
 
   // For AES, append "sAlT"
   if (forAes) {

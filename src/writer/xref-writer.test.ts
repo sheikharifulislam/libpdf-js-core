@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { ByteWriter } from "#src/io/byte-writer";
 import { PdfRef } from "#src/objects/pdf-ref";
 import { writeXRefStream, writeXRefTable, type XRefWriteEntry } from "./xref-writer";
 
@@ -9,14 +10,15 @@ describe("writeXRefTable", () => {
       { objectNumber: 1, generation: 0, type: "inuse", offset: 100 },
     ];
 
-    const result = new TextDecoder().decode(
-      writeXRefTable({
-        entries,
-        size: 2,
-        xrefOffset: 200,
-        root: PdfRef.of(1, 0),
-      }),
-    );
+    const writer = new ByteWriter();
+    writeXRefTable(writer, {
+      entries,
+      size: 2,
+      xrefOffset: 200,
+      root: PdfRef.of(1, 0),
+    });
+
+    const result = new TextDecoder().decode(writer.toBytes());
 
     expect(result).toContain("xref");
     expect(result).toContain("trailer");
@@ -30,14 +32,15 @@ describe("writeXRefTable", () => {
       { objectNumber: 1, generation: 0, type: "inuse", offset: 12345 },
     ];
 
-    const result = new TextDecoder().decode(
-      writeXRefTable({
-        entries,
-        size: 2,
-        xrefOffset: 200,
-        root: PdfRef.of(1, 0),
-      }),
-    );
+    const writer = new ByteWriter();
+    writeXRefTable(writer, {
+      entries,
+      size: 2,
+      xrefOffset: 200,
+      root: PdfRef.of(1, 0),
+    });
+
+    const result = new TextDecoder().decode(writer.toBytes());
 
     // Each entry line should be 20 chars: 10 + space + 5 + space + 1 + \r\n
     expect(result).toContain("0000000000 65535 f\r\n");
@@ -49,14 +52,15 @@ describe("writeXRefTable", () => {
       { objectNumber: 0, generation: 65535, type: "free", offset: 0 },
     ];
 
-    const result = new TextDecoder().decode(
-      writeXRefTable({
-        entries,
-        size: 1,
-        xrefOffset: 100,
-        root: PdfRef.of(1, 0),
-      }),
-    );
+    const writer = new ByteWriter();
+    writeXRefTable(writer, {
+      entries,
+      size: 1,
+      xrefOffset: 100,
+      root: PdfRef.of(1, 0),
+    });
+
+    const result = new TextDecoder().decode(writer.toBytes());
 
     expect(result).toContain("0000000000 65535 f\r\n");
   });
@@ -66,14 +70,15 @@ describe("writeXRefTable", () => {
       { objectNumber: 1, generation: 0, type: "inuse", offset: 500 },
     ];
 
-    const result = new TextDecoder().decode(
-      writeXRefTable({
-        entries,
-        size: 2,
-        xrefOffset: 100,
-        root: PdfRef.of(1, 0),
-      }),
-    );
+    const writer = new ByteWriter();
+    writeXRefTable(writer, {
+      entries,
+      size: 2,
+      xrefOffset: 100,
+      root: PdfRef.of(1, 0),
+    });
+
+    const result = new TextDecoder().decode(writer.toBytes());
 
     expect(result).toContain("0000000500 00000 n\r\n");
   });
@@ -86,14 +91,15 @@ describe("writeXRefTable", () => {
       { objectNumber: 6, generation: 0, type: "inuse", offset: 600 },
     ];
 
-    const result = new TextDecoder().decode(
-      writeXRefTable({
-        entries,
-        size: 7,
-        xrefOffset: 1000,
-        root: PdfRef.of(1, 0),
-      }),
-    );
+    const writer = new ByteWriter();
+    writeXRefTable(writer, {
+      entries,
+      size: 7,
+      xrefOffset: 1000,
+      root: PdfRef.of(1, 0),
+    });
+
+    const result = new TextDecoder().decode(writer.toBytes());
 
     // Should have two subsections
     expect(result).toContain("1 2\n"); // Objects 1-2
@@ -105,14 +111,15 @@ describe("writeXRefTable", () => {
       { objectNumber: 5, generation: 0, type: "inuse", offset: 100 },
     ];
 
-    const result = new TextDecoder().decode(
-      writeXRefTable({
-        entries,
-        size: 10,
-        xrefOffset: 500,
-        root: PdfRef.of(1, 0),
-      }),
-    );
+    const writer = new ByteWriter();
+    writeXRefTable(writer, {
+      entries,
+      size: 10,
+      xrefOffset: 500,
+      root: PdfRef.of(1, 0),
+    });
+
+    const result = new TextDecoder().decode(writer.toBytes());
 
     expect(result).toContain("/Size 10");
   });
@@ -122,15 +129,16 @@ describe("writeXRefTable", () => {
       { objectNumber: 1, generation: 0, type: "inuse", offset: 100 },
     ];
 
-    const result = new TextDecoder().decode(
-      writeXRefTable({
-        entries,
-        size: 2,
-        xrefOffset: 500,
-        prev: 1234,
-        root: PdfRef.of(1, 0),
-      }),
-    );
+    const writer = new ByteWriter();
+    writeXRefTable(writer, {
+      entries,
+      size: 2,
+      xrefOffset: 500,
+      prev: 1234,
+      root: PdfRef.of(1, 0),
+    });
+
+    const result = new TextDecoder().decode(writer.toBytes());
 
     expect(result).toContain("/Prev 1234");
   });
@@ -140,14 +148,15 @@ describe("writeXRefTable", () => {
       { objectNumber: 1, generation: 0, type: "inuse", offset: 100 },
     ];
 
-    const result = new TextDecoder().decode(
-      writeXRefTable({
-        entries,
-        size: 2,
-        xrefOffset: 9999,
-        root: PdfRef.of(1, 0),
-      }),
-    );
+    const writer = new ByteWriter();
+    writeXRefTable(writer, {
+      entries,
+      size: 2,
+      xrefOffset: 9999,
+      root: PdfRef.of(1, 0),
+    });
+
+    const result = new TextDecoder().decode(writer.toBytes());
 
     expect(result).toContain("startxref\n9999\n");
   });
@@ -157,27 +166,29 @@ describe("writeXRefTable", () => {
       { objectNumber: 1, generation: 0, type: "inuse", offset: 100 },
     ];
 
-    const result = new TextDecoder().decode(
-      writeXRefTable({
-        entries,
-        size: 2,
-        xrefOffset: 500,
-        root: PdfRef.of(5, 0),
-      }),
-    );
+    const writer = new ByteWriter();
+    writeXRefTable(writer, {
+      entries,
+      size: 2,
+      xrefOffset: 500,
+      root: PdfRef.of(5, 0),
+    });
+
+    const result = new TextDecoder().decode(writer.toBytes());
 
     expect(result).toContain("/Root 5 0 R");
   });
 
   it("handles empty entries list", () => {
-    const result = new TextDecoder().decode(
-      writeXRefTable({
-        entries: [],
-        size: 1,
-        xrefOffset: 100,
-        root: PdfRef.of(1, 0),
-      }),
-    );
+    const writer = new ByteWriter();
+    writeXRefTable(writer, {
+      entries: [],
+      size: 1,
+      xrefOffset: 100,
+      root: PdfRef.of(1, 0),
+    });
+
+    const result = new TextDecoder().decode(writer.toBytes());
 
     // Should still produce valid structure
     expect(result).toContain("xref");
@@ -185,15 +196,16 @@ describe("writeXRefTable", () => {
   });
 
   it("includes optional Info reference", () => {
-    const result = new TextDecoder().decode(
-      writeXRefTable({
-        entries: [],
-        size: 3,
-        xrefOffset: 100,
-        root: PdfRef.of(1, 0),
-        info: PdfRef.of(2, 0),
-      }),
-    );
+    const writer = new ByteWriter();
+    writeXRefTable(writer, {
+      entries: [],
+      size: 3,
+      xrefOffset: 100,
+      root: PdfRef.of(1, 0),
+      info: PdfRef.of(2, 0),
+    });
+
+    const result = new TextDecoder().decode(writer.toBytes());
 
     expect(result).toContain("/Info 2 0 R");
   });
@@ -206,7 +218,8 @@ describe("writeXRefStream", () => {
       { objectNumber: 1, generation: 0, type: "inuse", offset: 100 },
     ];
 
-    const { bytes } = writeXRefStream({
+    const writer = new ByteWriter();
+    writeXRefStream(writer, {
       entries,
       size: 3,
       xrefOffset: 500,
@@ -214,7 +227,7 @@ describe("writeXRefStream", () => {
       streamObjectNumber: 2,
     });
 
-    const result = new TextDecoder().decode(bytes);
+    const result = new TextDecoder().decode(writer.toBytes());
 
     expect(result).toContain("2 0 obj");
     expect(result).toContain("endobj");
@@ -227,7 +240,8 @@ describe("writeXRefStream", () => {
       { objectNumber: 1, generation: 0, type: "inuse", offset: 100 },
     ];
 
-    const { stream } = writeXRefStream({
+    const writer = new ByteWriter();
+    const stream = writeXRefStream(writer, {
       entries,
       size: 2,
       xrefOffset: 500,
@@ -243,7 +257,8 @@ describe("writeXRefStream", () => {
       { objectNumber: 1, generation: 0, type: "inuse", offset: 100 },
     ];
 
-    const { stream } = writeXRefStream({
+    const writer = new ByteWriter();
+    const stream = writeXRefStream(writer, {
       entries,
       size: 2,
       xrefOffset: 500,
@@ -263,7 +278,8 @@ describe("writeXRefStream", () => {
       { objectNumber: 6, generation: 0, type: "inuse", offset: 200 },
     ];
 
-    const { stream } = writeXRefStream({
+    const writer = new ByteWriter();
+    const stream = writeXRefStream(writer, {
       entries,
       size: 7,
       xrefOffset: 500,
@@ -284,7 +300,8 @@ describe("writeXRefStream", () => {
       { objectNumber: 1, generation: 0, type: "inuse", offset: 255 },
     ];
 
-    const { stream } = writeXRefStream({
+    const writer = new ByteWriter();
+    const stream = writeXRefStream(writer, {
       entries,
       size: 2,
       xrefOffset: 500,
@@ -301,7 +318,8 @@ describe("writeXRefStream", () => {
       { objectNumber: 1, generation: 0, type: "inuse", offset: 100 },
     ];
 
-    const { stream } = writeXRefStream({
+    const writer = new ByteWriter();
+    const stream = writeXRefStream(writer, {
       entries,
       size: 2,
       xrefOffset: 500,
@@ -318,7 +336,8 @@ describe("writeXRefStream", () => {
       { objectNumber: 1, generation: 0, type: "inuse", offset: 100 },
     ];
 
-    const { stream } = writeXRefStream({
+    const writer = new ByteWriter();
+    const stream = writeXRefStream(writer, {
       entries,
       size: 10,
       xrefOffset: 500,
@@ -342,7 +361,8 @@ describe("writeXRefStream", () => {
       },
     ];
 
-    const { stream } = writeXRefStream({
+    const writer = new ByteWriter();
+    const stream = writeXRefStream(writer, {
       entries,
       size: 3,
       xrefOffset: 500,
@@ -370,7 +390,8 @@ describe("writeXRefStream", () => {
       { objectNumber: 1, generation: 0, type: "inuse", offset: 1000000 },
     ];
 
-    const { stream } = writeXRefStream({
+    const writer = new ByteWriter();
+    const stream = writeXRefStream(writer, {
       entries,
       size: 2,
       xrefOffset: 2000000,
@@ -390,7 +411,8 @@ describe("xref stream binary encoding", () => {
       { objectNumber: 1, generation: 0, type: "inuse", offset: 100 },
     ];
 
-    const { stream } = writeXRefStream({
+    const writer = new ByteWriter();
+    const stream = writeXRefStream(writer, {
       entries,
       size: 2,
       xrefOffset: 500,
@@ -416,7 +438,8 @@ describe("xref stream binary encoding", () => {
       { objectNumber: 1, generation: 0, type: "inuse", offset: 100000 },
     ];
 
-    const { stream } = writeXRefStream({
+    const writer = new ByteWriter();
+    const stream = writeXRefStream(writer, {
       entries,
       size: 2,
       xrefOffset: 500,
@@ -439,7 +462,8 @@ describe("xref stream binary encoding", () => {
       { objectNumber: 11, generation: 0, type: "inuse", offset: 1100 },
     ];
 
-    const { stream } = writeXRefStream({
+    const writer = new ByteWriter();
+    const stream = writeXRefStream(writer, {
       entries,
       size: 12,
       xrefOffset: 500,

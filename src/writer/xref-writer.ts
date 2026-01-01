@@ -5,33 +5,17 @@
  * xref streams (PDF 1.5+).
  */
 
+import { SINGLE_BYTE_MASK } from "#src/helpers/chars.ts";
+import type { ByteWriter } from "#src/io/byte-writer";
 import { PdfArray } from "#src/objects/pdf-array";
 import { PdfDict } from "#src/objects/pdf-dict";
 import { PdfName } from "#src/objects/pdf-name";
 import { PdfNumber } from "#src/objects/pdf-number";
+import type { PdfObject } from "#src/objects/pdf-object";
+import type { PdfPrimitive } from "#src/objects/pdf-primitive";
 import { PdfRef } from "#src/objects/pdf-ref";
 import { PdfStream } from "#src/objects/pdf-stream";
-import { serializeObject } from "./serializer";
-
-const textEncoder = new TextEncoder();
-
-function encode(str: string): Uint8Array {
-  return textEncoder.encode(str);
-}
-
-function concat(...arrays: Uint8Array[]): Uint8Array {
-  const totalLength = arrays.reduce((sum, arr) => sum + arr.length, 0);
-  const result = new Uint8Array(totalLength);
-
-  let offset = 0;
-
-  for (const arr of arrays) {
-    result.set(arr, offset);
-    offset += arr.length;
-  }
-
-  return result;
-}
+import { PdfString } from "#src/objects/pdf-string";
 
 /**
  * Represents an entry in the xref section.
@@ -121,7 +105,7 @@ function groupIntoSubsections(
 }
 
 /**
- * Write a traditional xref table.
+ * Write a traditional xref table to the provided ByteWriter.
  *
  * Format:
  * ```
@@ -138,38 +122,34 @@ function groupIntoSubsections(
  * %%EOF
  * ```
  */
-export function writeXRefTable(options: XRefWriteOptions): Uint8Array {
-  const parts: Uint8Array[] = [];
-
+export function writeXRefTable(writer: ByteWriter, options: XRefWriteOptions): void {
   // xref keyword
-  parts.push(encode("xref\n"));
+  writer.writeAscii("xref\n");
 
   // Group into subsections
   const subsections = groupIntoSubsections(options.entries);
 
   for (const subsection of subsections) {
     // Subsection header: start count
-    parts.push(encode(`${subsection.start} ${subsection.entries.length}\n`));
+    writer.writeAscii(`${subsection.start} ${subsection.entries.length}\n`);
 
     // Entries (each is exactly 20 bytes)
     for (const entry of subsection.entries) {
       const line = formatXRefTableEntry(entry);
-
-      parts.push(encode(line));
+      writer.writeAscii(line);
     }
   }
 
   // Trailer
-  parts.push(encode("trailer\n"));
-  parts.push(serializeObject(buildTrailerDict(options)));
-  parts.push(encode("\n"));
+  writer.writeAscii("trailer\n");
+  const trailerDict = buildTrailerDict(options);
+  trailerDict.toBytes(writer);
+  writer.writeAscii("\n");
 
   // startxref
-  parts.push(encode("startxref\n"));
-  parts.push(encode(`${options.xrefOffset}\n`));
-  parts.push(encode("%%EOF\n"));
-
-  return concat(...parts);
+  writer.writeAscii("startxref\n");
+  writer.writeAscii(`${options.xrefOffset}\n`);
+  writer.writeAscii("%%EOF\n");
 }
 
 /**
@@ -190,7 +170,7 @@ function formatXRefTableEntry(entry: XRefWriteEntry): string {
  * Build the trailer dictionary.
  */
 function buildTrailerDict(options: XRefWriteOptions): PdfDict {
-  const entries: [string, import("#src/objects/object").PdfObject][] = [
+  const entries: [string, PdfObject][] = [
     ["Size", PdfNumber.of(options.size)],
     ["Root", options.root],
   ];
@@ -209,7 +189,6 @@ function buildTrailerDict(options: XRefWriteOptions): PdfDict {
 
   if (options.id) {
     const [id1, id2] = options.id;
-    const { PdfString } = require("#src/objects/pdf-string");
     entries.push(["ID", PdfArray.of(new PdfString(id1, "hex"), new PdfString(id2, "hex"))]);
   }
 
@@ -255,7 +234,7 @@ function encodeNumber(value: number, width: number): Uint8Array {
   const bytes = new Uint8Array(width);
 
   for (let i = width - 1; i >= 0; i--) {
-    bytes[i] = value & 0xff;
+    bytes[i] = value & SINGLE_BYTE_MASK;
     value = Math.floor(value / 256);
   }
 
@@ -311,7 +290,7 @@ function encodeXRefStreamData(
  * Format: [start1 count1 start2 count2 ...]
  */
 function buildIndexArray(subsections: { start: number; entries: XRefWriteEntry[] }[]): PdfArray {
-  const items: import("#src/objects/object").PdfObject[] = [];
+  const items: PdfObject[] = [];
 
   for (const sub of subsections) {
     items.push(PdfNumber.of(sub.start));
@@ -322,15 +301,14 @@ function buildIndexArray(subsections: { start: number; entries: XRefWriteEntry[]
 }
 
 /**
- * Write an xref stream (PDF 1.5+).
+ * Write an xref stream (PDF 1.5+) to the provided ByteWriter.
  *
- * Returns the stream object and the serialized bytes.
- * The caller is responsible for writing the object definition.
+ * Returns the stream object for reference.
  */
-export function writeXRefStream(options: XRefWriteOptions & { streamObjectNumber: number }): {
-  stream: PdfStream;
-  bytes: Uint8Array;
-} {
+export function writeXRefStream(
+  writer: ByteWriter,
+  options: XRefWriteOptions & { streamObjectNumber: number },
+): PdfStream {
   // Group into subsections (sorted)
   const subsections = groupIntoSubsections(options.entries);
 
@@ -344,7 +322,7 @@ export function writeXRefStream(options: XRefWriteOptions & { streamObjectNumber
   const data = encodeXRefStreamData(orderedEntries, widths);
 
   // Build stream dictionary
-  const dictEntries: [string, import("#src/objects/object").PdfObject][] = [
+  const dictEntries: [string, PdfObject][] = [
     ["Type", PdfName.of("XRef")],
     ["Size", PdfNumber.of(options.size)],
     ["W", PdfArray.of(...widths.map(w => PdfNumber.of(w)))],
@@ -371,27 +349,21 @@ export function writeXRefStream(options: XRefWriteOptions & { streamObjectNumber
 
   if (options.id) {
     const [id1, id2] = options.id;
-    const { PdfString } = require("#src/objects/pdf-string");
     dictEntries.push(["ID", PdfArray.of(new PdfString(id1, "hex"), new PdfString(id2, "hex"))]);
   }
 
   const stream = new PdfStream(dictEntries, data);
 
-  // Serialize the complete indirect object
+  // Write the indirect object
   const ref = PdfRef.of(options.streamObjectNumber, 0);
-  const objBytes = concat(
-    encode(`${ref.objectNumber} ${ref.generation} obj\n`),
-    serializeObject(stream),
-    encode("\nendobj\n"),
-  );
+  writer.writeAscii(`${ref.objectNumber} ${ref.generation} obj\n`);
+  stream.toBytes(writer);
+  writer.writeAscii("\nendobj\n");
 
-  // Build footer
-  const footer = concat(
-    objBytes,
-    encode("startxref\n"),
-    encode(`${options.xrefOffset}\n`),
-    encode("%%EOF\n"),
-  );
+  // Write footer
+  writer.writeAscii("startxref\n");
+  writer.writeAscii(`${options.xrefOffset}\n`);
+  writer.writeAscii("%%EOF\n");
 
-  return { stream, bytes: footer };
+  return stream;
 }

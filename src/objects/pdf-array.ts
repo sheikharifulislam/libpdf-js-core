@@ -1,4 +1,6 @@
-import type { PdfObject } from "./object";
+import type { ByteWriter } from "#src/io/byte-writer";
+import type { PdfObject } from "./pdf-object";
+import type { PdfPrimitive } from "./pdf-primitive";
 
 /**
  * PDF array object (mutable).
@@ -7,7 +9,7 @@ import type { PdfObject } from "./object";
  *
  * Tracks modifications via a dirty flag for incremental save support.
  */
-export class PdfArray {
+export class PdfArray implements PdfPrimitive {
   get type(): "array" {
     return "array";
   }
@@ -92,5 +94,22 @@ export class PdfArray {
    */
   static of(...items: PdfObject[]): PdfArray {
     return new PdfArray(items);
+  }
+
+  toBytes(writer: ByteWriter): void {
+    writer.writeAscii("[");
+
+    let first = true;
+
+    for (const item of this.items) {
+      if (!first) {
+        writer.writeAscii(" ");
+      }
+      // Each item in the union implements PdfPrimitive
+      item.toBytes(writer);
+      first = false;
+    }
+
+    writer.writeAscii("]");
   }
 }

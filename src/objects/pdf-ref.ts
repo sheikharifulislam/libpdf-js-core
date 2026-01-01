@@ -1,3 +1,6 @@
+import type { ByteWriter } from "#src/io/byte-writer";
+import type { PdfPrimitive } from "./pdf-primitive";
+
 /**
  * PDF indirect reference (interned).
  *
@@ -6,7 +9,7 @@
  * References are interned — `PdfRef.of(1, 0) === PdfRef.of(1, 0)`.
  * Use `.of()` to get or create instances.
  */
-export class PdfRef {
+export class PdfRef implements PdfPrimitive {
   get type(): "ref" {
     return "ref";
   }
@@ -40,5 +43,9 @@ export class PdfRef {
    */
   toString(): string {
     return `${this.objectNumber} ${this.generation} R`;
+  }
+
+  toBytes(writer: ByteWriter): void {
+    writer.writeAscii(`${this.objectNumber} ${this.generation} R`);
   }
 }

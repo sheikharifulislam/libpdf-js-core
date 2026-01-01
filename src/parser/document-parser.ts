@@ -1,8 +1,8 @@
 import type { Scanner } from "#src/io/scanner";
-import type { PdfObject } from "#src/objects/object";
 import { PdfArray } from "#src/objects/pdf-array";
 import { PdfDict } from "#src/objects/pdf-dict";
 import { PdfNumber } from "#src/objects/pdf-number";
+import type { PdfObject } from "#src/objects/pdf-object.ts";
 import { PdfRef } from "#src/objects/pdf-ref";
 import { PdfStream } from "#src/objects/pdf-stream";
 import { PdfString } from "#src/objects/pdf-string";

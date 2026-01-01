@@ -1,3 +1,38 @@
+import { CHAR_HASH, DELIMITERS, WHITESPACE } from "#src/helpers/chars";
+import type { ByteWriter } from "#src/io/byte-writer";
+import type { PdfPrimitive } from "./pdf-primitive";
+
+// Characters that need hex escaping in names (PDF 1.7 spec 7.3.5)
+// These are: whitespace, delimiters (), <>, [], {}, /, %, #
+// Plus anything outside printable ASCII (33-126)
+const NAME_NEEDS_ESCAPE = new Set([...WHITESPACE, ...DELIMITERS, CHAR_HASH]);
+
+/**
+ * Escape a PDF name for serialization.
+ *
+ * Uses #XX hex escaping for:
+ * - Bytes outside printable ASCII (33-126)
+ * - Delimiter characters
+ * - The # character itself
+ */
+function escapeName(name: string): string {
+  const encoder = new TextEncoder();
+  const bytes = encoder.encode(name);
+
+  let result = "";
+
+  for (const byte of bytes) {
+    if (byte < 33 || byte > 126 || NAME_NEEDS_ESCAPE.has(byte)) {
+      // Use hex escape
+      result += `#${byte.toString(16).toUpperCase().padStart(2, "0")}`;
+    } else {
+      result += String.fromCharCode(byte);
+    }
+  }
+
+  return result;
+}
+
 /**
  * PDF name object (interned).
  *
@@ -6,7 +41,7 @@
  * Names are interned — `PdfName.of("Type") === PdfName.of("Type")`.
  * Use `.of()` to get or create instances.
  */
-export class PdfName {
+export class PdfName implements PdfPrimitive {
   get type(): "name" {
     return "name";
   }
@@ -29,6 +64,10 @@ export class PdfName {
     }
 
     return cached;
+  }
+
+  toBytes(writer: ByteWriter): void {
+    writer.writeAscii(`/${escapeName(this.value)}`);
   }
 
   // Common PDF names (pre-cached)

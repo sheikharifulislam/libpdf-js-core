@@ -1,3 +1,6 @@
+import type { ByteWriter } from "#src/io/byte-writer";
+import type { PdfPrimitive } from "./pdf-primitive";
+
 /**
  * PDF boolean object.
  *
@@ -5,7 +8,7 @@
  *
  * Use `PdfBool.of(value)` to get cached instances.
  */
-export class PdfBool {
+export class PdfBool implements PdfPrimitive {
   static readonly TRUE = new PdfBool(true);
   static readonly FALSE = new PdfBool(false);
 
@@ -17,5 +20,9 @@ export class PdfBool {
 
   static of(value: boolean): PdfBool {
     return value ? PdfBool.TRUE : PdfBool.FALSE;
+  }
+
+  toBytes(writer: ByteWriter): void {
+    writer.writeAscii(this.value ? "true" : "false");
   }
 }

@@ -1,3 +1,66 @@
+import { CHAR_BACKSLASH, CHAR_PARENTHESIS_CLOSE, CHAR_PARENTHESIS_OPEN } from "#src/helpers/chars";
+import type { ByteWriter } from "#src/io/byte-writer";
+import type { PdfPrimitive } from "./pdf-primitive";
+
+/**
+ * Escape a PDF literal string for serialization.
+ *
+ * Handles:
+ * - Backslash escaping for \, (, )
+ * - Other bytes pass through unchanged
+ */
+function escapeLiteralString(bytes: Uint8Array): Uint8Array {
+  // Pre-scan to count bytes needing escape
+  let escapeCount = 0;
+
+  for (const byte of bytes) {
+    if (
+      byte === CHAR_BACKSLASH ||
+      byte === CHAR_PARENTHESIS_OPEN ||
+      byte === CHAR_PARENTHESIS_CLOSE
+    ) {
+      escapeCount++;
+    }
+  }
+
+  if (escapeCount === 0) {
+    return bytes;
+  }
+
+  const result = new Uint8Array(bytes.length + escapeCount);
+  let j = 0;
+
+  for (const byte of bytes) {
+    if (byte === CHAR_BACKSLASH) {
+      result[j++] = CHAR_BACKSLASH;
+      result[j++] = CHAR_BACKSLASH;
+    } else if (byte === CHAR_PARENTHESIS_OPEN) {
+      result[j++] = CHAR_BACKSLASH;
+      result[j++] = CHAR_PARENTHESIS_OPEN;
+    } else if (byte === CHAR_PARENTHESIS_CLOSE) {
+      result[j++] = CHAR_BACKSLASH;
+      result[j++] = CHAR_PARENTHESIS_CLOSE;
+    } else {
+      result[j++] = byte;
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Convert bytes to hex string.
+ */
+function bytesToHex(bytes: Uint8Array): string {
+  let hex = "";
+
+  for (const byte of bytes) {
+    hex += byte.toString(16).toUpperCase().padStart(2, "0");
+  }
+
+  return hex;
+}
+
 /**
  * PDF string object.
  *
@@ -5,7 +68,7 @@
  *
  * Stores raw bytes — decode with `.asString()` when needed.
  */
-export class PdfString {
+export class PdfString implements PdfPrimitive {
   get type(): "string" {
     return "string";
   }
@@ -49,5 +112,16 @@ export class PdfString {
     }
 
     return new PdfString(bytes, "hex");
+  }
+
+  toBytes(writer: ByteWriter): void {
+    if (this.format === "hex") {
+      writer.writeAscii(`<${bytesToHex(this.bytes)}>`);
+    } else {
+      // Literal format
+      writer.writeByte(CHAR_PARENTHESIS_OPEN);
+      writer.writeBytes(escapeLiteralString(this.bytes));
+      writer.writeByte(CHAR_PARENTHESIS_CLOSE);
+    }
   }
 }

@@ -1,8 +1,10 @@
-import type { PdfObject } from "./object";
+import type { ByteWriter } from "#src/io/byte-writer";
 import type { PdfArray } from "./pdf-array";
 import type { PdfBool } from "./pdf-bool";
 import { PdfName } from "./pdf-name";
 import type { PdfNumber } from "./pdf-number";
+import type { PdfObject } from "./pdf-object";
+import type { PdfPrimitive } from "./pdf-primitive";
 import type { PdfRef } from "./pdf-ref";
 import type { PdfString } from "./pdf-string";
 
@@ -14,7 +16,7 @@ import type { PdfString } from "./pdf-string";
  * Keys are always PdfName. Tracks modifications via a dirty flag
  * for incremental save support.
  */
-export class PdfDict {
+export class PdfDict implements PdfPrimitive {
   get type(): "dict" | "stream" {
     return "dict";
   }
@@ -150,5 +152,25 @@ export class PdfDict {
    */
   static of(entries: Record<string, PdfObject>): PdfDict {
     return new PdfDict(Object.entries(entries));
+  }
+
+  toBytes(writer: ByteWriter): void {
+    writer.writeAscii("<<");
+
+    for (const [key, value] of this.entries) {
+      // Skip null/undefined values silently (lenient serialization)
+      if (value == null) {
+        continue;
+      }
+
+      // Write key (PdfName implements toBytes)
+      key.toBytes(writer);
+      writer.writeAscii(" ");
+
+      // Write value (each type in PdfObject union implements PdfPrimitive)
+      value.toBytes(writer);
+    }
+
+    writer.writeAscii(">>");
   }
 }

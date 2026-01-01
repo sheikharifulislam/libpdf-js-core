@@ -1,12 +1,18 @@
 import {
-  ANGLE_BRACKET_CLOSE,
-  ANGLE_BRACKET_OPEN,
-  BACKSLASH,
   BS,
+  CHAR_ANGLE_BRACKET_CLOSE,
+  CHAR_ANGLE_BRACKET_OPEN,
+  CHAR_BACKSLASH,
   CHAR_HASH,
   CHAR_MINUS,
+  CHAR_PARENTHESIS_CLOSE,
+  CHAR_PARENTHESIS_OPEN,
+  CHAR_PERCENT,
   CHAR_PERIOD,
   CHAR_PLUS,
+  CHAR_SLASH,
+  CHAR_SQUARE_BRACKET_CLOSE,
+  CHAR_SQUARE_BRACKET_OPEN,
   CR,
   DIGIT_0,
   DIGIT_9,
@@ -16,13 +22,7 @@ import {
   isHexDigit,
   isRegularChar,
   LF,
-  PARENTHESIS_CLOSE,
-  PARENTHESIS_OPEN,
-  PERCENT,
   SINGLE_BYTE_MASK,
-  SLASH,
-  SQUARE_BRACKET_CLOSE,
-  SQUARE_BRACKET_OPEN,
   TAB,
   WHITESPACE,
 } from "#src/helpers/chars";
@@ -94,7 +94,7 @@ export class TokenReader {
       }
 
       // Comment: % to end of line
-      if (byte === PERCENT) {
+      if (byte === CHAR_PERCENT) {
         this.scanner.advance();
         this.skipToEndOfLine();
         continue;
@@ -136,33 +136,33 @@ export class TokenReader {
     }
 
     // Name: /...
-    if (byte === SLASH) {
+    if (byte === CHAR_SLASH) {
       return this.readName(position);
     }
 
     // Literal string: (...)
-    if (byte === PARENTHESIS_OPEN) {
+    if (byte === CHAR_PARENTHESIS_OPEN) {
       return this.readLiteralString(position);
     }
 
     // Hex string or dict delimiter: < or <<
-    if (byte === ANGLE_BRACKET_OPEN) {
+    if (byte === CHAR_ANGLE_BRACKET_OPEN) {
       return this.readAngleBracket(position);
     }
 
     // Dict end or unexpected >
-    if (byte === ANGLE_BRACKET_CLOSE) {
+    if (byte === CHAR_ANGLE_BRACKET_CLOSE) {
       return this.readClosingAngle(position);
     }
 
     // Array delimiters
-    if (byte === SQUARE_BRACKET_OPEN) {
+    if (byte === CHAR_SQUARE_BRACKET_OPEN) {
       this.scanner.advance();
 
       return { type: "delimiter", value: "[", position };
     }
 
-    if (byte === SQUARE_BRACKET_CLOSE) {
+    if (byte === CHAR_SQUARE_BRACKET_CLOSE) {
       this.scanner.advance();
 
       return { type: "delimiter", value: "]", position };
@@ -342,14 +342,14 @@ export class TokenReader {
 
       this.scanner.advance();
 
-      if (byte === PARENTHESIS_OPEN) {
+      if (byte === CHAR_PARENTHESIS_OPEN) {
         // Nested (
         parenDepth++;
         bytes.push(byte);
         continue;
       }
 
-      if (byte === PARENTHESIS_CLOSE) {
+      if (byte === CHAR_PARENTHESIS_CLOSE) {
         // Closing )
         parenDepth--;
 
@@ -360,7 +360,7 @@ export class TokenReader {
         continue;
       }
 
-      if (byte === BACKSLASH) {
+      if (byte === CHAR_BACKSLASH) {
         // Escape sequence
         const escaped = this.readEscapeSequence();
 
@@ -417,12 +417,12 @@ export class TokenReader {
         return BS; // \b -> BS
       case 0x66:
         return FF; // \f -> FF
-      case PARENTHESIS_OPEN:
-        return PARENTHESIS_OPEN; // \( -> (
-      case PARENTHESIS_CLOSE:
-        return PARENTHESIS_CLOSE; // \) -> )
-      case BACKSLASH:
-        return BACKSLASH; // \\ -> \
+      case CHAR_PARENTHESIS_OPEN:
+        return CHAR_PARENTHESIS_OPEN; // \( -> (
+      case CHAR_PARENTHESIS_CLOSE:
+        return CHAR_PARENTHESIS_CLOSE; // \) -> )
+      case CHAR_BACKSLASH:
+        return CHAR_BACKSLASH; // \\ -> \
       case CR:
         // Line continuation: \ at end of line
         if (this.scanner.peek() === LF) {
@@ -468,7 +468,7 @@ export class TokenReader {
     this.scanner.advance(); // Skip first <
 
     // Check for <<
-    if (this.scanner.peek() === ANGLE_BRACKET_OPEN) {
+    if (this.scanner.peek() === CHAR_ANGLE_BRACKET_OPEN) {
       this.scanner.advance();
 
       return { type: "delimiter", value: "<<", position };
@@ -485,9 +485,9 @@ export class TokenReader {
     while (true) {
       const byte = this.scanner.peek();
 
-      if (byte === -1 || byte === ANGLE_BRACKET_CLOSE) {
+      if (byte === -1 || byte === CHAR_ANGLE_BRACKET_CLOSE) {
         // EOF or >
-        if (byte === ANGLE_BRACKET_CLOSE) {
+        if (byte === CHAR_ANGLE_BRACKET_CLOSE) {
           this.scanner.advance();
         }
 
@@ -533,7 +533,7 @@ export class TokenReader {
     this.scanner.advance(); // Skip first >
 
     // Check for >>
-    if (this.scanner.peek() === ANGLE_BRACKET_CLOSE) {
+    if (this.scanner.peek() === CHAR_ANGLE_BRACKET_CLOSE) {
       this.scanner.advance();
 
       return { type: "delimiter", value: ">>", position };

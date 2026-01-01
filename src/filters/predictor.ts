@@ -1,3 +1,4 @@
+import { SINGLE_BYTE_MASK } from "#src/helpers/chars.ts";
 import type { PdfDict } from "#src/objects/pdf-dict";
 
 /**
@@ -70,7 +71,7 @@ function decodeTiffPredictor(
           output[pos] = data[pos];
         } else {
           // Add previous pixel value (mod 256)
-          output[pos] = (data[pos] + output[pos - bytesPerPixel]) & 0xff;
+          output[pos] = (data[pos] + output[pos - bytesPerPixel]) & SINGLE_BYTE_MASK;
         }
       }
     }
@@ -89,10 +90,10 @@ function decodeTiffPredictor(
           // 16-bit addition with carry
           const prev = (output[pos - bytesPerPixel] << 8) | output[pos - bytesPerPixel + 1];
           const curr = (data[pos] << 8) | data[pos + 1];
-          const sum = (prev + curr) & 0xff;
+          const sum = (prev + curr) & SINGLE_BYTE_MASK;
 
-          output[pos] = (sum >> 8) & 0xff;
-          output[pos + 1] = sum & 0xff;
+          output[pos] = (sum >> 8) & SINGLE_BYTE_MASK;
+          output[pos + 1] = sum & SINGLE_BYTE_MASK;
         }
       }
     }
@@ -108,7 +109,7 @@ function decodeTiffPredictor(
         if (col < bytesPerPixel) {
           output[pos] = data[pos];
         } else {
-          output[pos] = (data[pos] + output[pos - bytesPerPixel]) & 0xff;
+          output[pos] = (data[pos] + output[pos - bytesPerPixel]) & SINGLE_BYTE_MASK;
         }
       }
     }
@@ -191,7 +192,7 @@ function decodeSubRow(input: Uint8Array, output: Uint8Array, bytesPerPixel: numb
   for (let i = 0; i < output.length; i++) {
     const left = i >= bytesPerPixel ? output[i - bytesPerPixel] : 0;
 
-    output[i] = (input[i] + left) & 0xff;
+    output[i] = (input[i] + left) & SINGLE_BYTE_MASK;
   }
 }
 
@@ -200,7 +201,7 @@ function decodeSubRow(input: Uint8Array, output: Uint8Array, bytesPerPixel: numb
  */
 function decodeUpRow(input: Uint8Array, output: Uint8Array, prevRow: Uint8Array): void {
   for (let i = 0; i < output.length; i++) {
-    output[i] = (input[i] + prevRow[i]) & 0xff;
+    output[i] = (input[i] + prevRow[i]) & SINGLE_BYTE_MASK;
   }
 }
 
@@ -217,7 +218,7 @@ function decodeAverageRow(
     const left = i >= bytesPerPixel ? output[i - bytesPerPixel] : 0;
     const up = prevRow[i];
 
-    output[i] = (input[i] + Math.floor((left + up) / 2)) & 0xff;
+    output[i] = (input[i] + Math.floor((left + up) / 2)) & SINGLE_BYTE_MASK;
   }
 }
 
@@ -235,7 +236,7 @@ function decodePaethRow(
     const up = prevRow[i];
     const upLeft = i >= bytesPerPixel ? prevRow[i - bytesPerPixel] : 0;
 
-    output[i] = (input[i] + paethPredictor(left, up, upLeft)) & 0xff;
+    output[i] = (input[i] + paethPredictor(left, up, upLeft)) & SINGLE_BYTE_MASK;
   }
 }
 

@@ -1,9 +1,11 @@
 import type { FilterSpec } from "#src/filters/filter";
 import { FilterPipeline } from "#src/filters/filter-pipeline";
-import type { PdfObject } from "./object";
+import type { ByteWriter } from "#src/io/byte-writer";
 import { PdfArray } from "./pdf-array";
 import { PdfDict } from "./pdf-dict";
 import { PdfName } from "./pdf-name";
+import type { PdfObject } from "./pdf-object";
+import type { PdfPrimitive } from "./pdf-primitive";
 
 /**
  * PDF stream object (dictionary + binary data).
@@ -131,5 +133,46 @@ export class PdfStream extends PdfDict {
       name: filter.value,
       params: params[i] ?? undefined,
     }));
+  }
+
+  /**
+   * Write stream to bytes.
+   *
+   * Streams consist of:
+   * 1. Dictionary (with /Length entry)
+   * 2. "stream" keyword followed by newline
+   * 3. Raw stream data
+   * 4. Newline followed by "endstream" keyword
+   */
+  override toBytes(writer: ByteWriter): void {
+    // Write dictionary with /Length first
+    writer.writeAscii("<<");
+
+    // Always write /Length as direct value
+    writer.writeAscii(`/Length ${this._data.length}`);
+
+    // Write other entries (skip /Length if present, we already wrote it)
+    for (const [key, value] of this) {
+      if (key.value === "Length") {
+        continue;
+      }
+
+      // Skip null/undefined values silently
+      if (value == null) {
+        continue;
+      }
+
+      key.toBytes(writer);
+      writer.writeAscii(" ");
+      value.toBytes(writer);
+    }
+
+    writer.writeAscii(">>");
+
+    // Per PDF spec, stream keyword followed by single newline (or CRLF)
+    // endstream preceded by newline
+    writer.writeAscii("\nstream\n");
+    writer.writeBytes(this._data);
+    writer.writeAscii("\nendstream");
   }
 }

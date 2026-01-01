@@ -13,9 +13,9 @@ import {
 } from "#src/document/linearization";
 import { ObjectRegistry } from "#src/document/object-registry";
 import { Scanner } from "#src/io/scanner";
-import type { PdfObject } from "#src/objects/object";
 import { PdfArray } from "#src/objects/pdf-array";
 import { PdfDict } from "#src/objects/pdf-dict";
+import type { PdfObject } from "#src/objects/pdf-object.ts";
 import { PdfRef } from "#src/objects/pdf-ref";
 import { PdfStream } from "#src/objects/pdf-stream";
 import {

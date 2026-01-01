@@ -1,3 +1,4 @@
+import { SINGLE_BYTE_MASK } from "#src/helpers/chars.ts";
 import type { PdfDict } from "#src/objects/pdf-dict";
 import type { Filter } from "./filter";
 
@@ -50,7 +51,7 @@ export class CCITTFaxFilter implements Filter {
     // Invert if BlackIs1 is false (default)
     if (!blackIs1) {
       for (let i = 0; i < result.length; i++) {
-        result[i] = ~result[i] & 0xff;
+        result[i] = ~result[i] & SINGLE_BYTE_MASK;
       }
     }
 

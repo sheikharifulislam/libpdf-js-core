@@ -14,6 +14,8 @@
  * @see https://en.wikipedia.org/wiki/RC4
  */
 
+import { SINGLE_BYTE_MASK } from "#src/helpers/chars.ts";
+
 /**
  * RC4 cipher for PDF encryption.
  *
@@ -60,7 +62,7 @@ export class RC4Cipher {
     let j = 0;
 
     for (let i = 0; i < 256; i++) {
-      j = (j + this.s[i] + key[i % key.length]) & 0xff;
+      j = (j + this.s[i] + key[i % key.length]) & SINGLE_BYTE_MASK;
       // Swap s[i] and s[j]
       const tmp = this.s[i];
       this.s[i] = this.s[j];
@@ -82,8 +84,8 @@ export class RC4Cipher {
 
     for (let k = 0; k < data.length; k++) {
       // Pseudo-Random Generation Algorithm (PRGA)
-      this.i = (this.i + 1) & 0xff;
-      this.j = (this.j + this.s[this.i]) & 0xff;
+      this.i = (this.i + 1) & SINGLE_BYTE_MASK;
+      this.j = (this.j + this.s[this.i]) & SINGLE_BYTE_MASK;
 
       // Swap s[i] and s[j]
       const tmp = this.s[this.i];
@@ -91,7 +93,7 @@ export class RC4Cipher {
       this.s[this.j] = tmp;
 
       // Generate keystream byte and XOR with input
-      const keystreamByte = this.s[(this.s[this.i] + this.s[this.j]) & 0xff];
+      const keystreamByte = this.s[(this.s[this.i] + this.s[this.j]) & SINGLE_BYTE_MASK];
       output[k] = data[k] ^ keystreamByte;
     }
 
@@ -116,7 +118,7 @@ export class RC4Cipher {
 
     let j = 0;
     for (let i = 0; i < 256; i++) {
-      j = (j + this.s[i] + key[i % key.length]) & 0xff;
+      j = (j + this.s[i] + key[i % key.length]) & SINGLE_BYTE_MASK;
       const tmp = this.s[i];
       this.s[i] = this.s[j];
       this.s[j] = tmp;

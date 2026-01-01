@@ -13,6 +13,7 @@
 
 import { randomBytes } from "@noble/ciphers/utils.js";
 import { sha256, sha384, sha512 } from "@noble/hashes/sha2.js";
+import { SINGLE_BYTE_MASK } from "#src/helpers/chars.ts";
 import { aesDecryptWithIv, aesEcbDecrypt, aesEcbEncrypt, aesEncryptWithIv } from "../ciphers/aes";
 
 /** Maximum password length for R5-R6 (UTF-8 bytes) */
@@ -378,10 +379,10 @@ export function generatePermsEntry(
   const perms = new Uint8Array(16);
 
   // Permissions (little-endian)
-  perms[0] = permissions & 0xff;
-  perms[1] = (permissions >> 8) & 0xff;
-  perms[2] = (permissions >> 16) & 0xff;
-  perms[3] = (permissions >> 24) & 0xff;
+  perms[0] = permissions & SINGLE_BYTE_MASK;
+  perms[1] = (permissions >> 8) & SINGLE_BYTE_MASK;
+  perms[2] = (permissions >> 16) & SINGLE_BYTE_MASK;
+  perms[3] = (permissions >> 24) & SINGLE_BYTE_MASK;
 
   // 0xFFFFFFFF
   perms[4] = 0xff;

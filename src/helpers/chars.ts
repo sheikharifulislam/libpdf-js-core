@@ -23,17 +23,17 @@ export const BS = 0x08; // Backspace
 export const WHITESPACE = new Set([NUL, TAB, LF, FF, CR, SPACE]);
 
 // Delimiters
-export const PARENTHESIS_OPEN = 0x28; // (
-export const PARENTHESIS_CLOSE = 0x29; // )
-export const ANGLE_BRACKET_OPEN = 0x3c; // <
-export const ANGLE_BRACKET_CLOSE = 0x3e; // >
-export const SQUARE_BRACKET_OPEN = 0x5b; // [
-export const SQUARE_BRACKET_CLOSE = 0x5d; // ]
-export const CURLY_BRACE_OPEN = 0x7b; // {
-export const CURLY_BRACE_CLOSE = 0x7d; // }
-export const SLASH = 0x2f; // /
-export const PERCENT = 0x25; // %
-export const BACKSLASH = 0x5c; // \
+export const CHAR_PARENTHESIS_OPEN = 0x28; // (
+export const CHAR_PARENTHESIS_CLOSE = 0x29; // )
+export const CHAR_ANGLE_BRACKET_OPEN = 0x3c; // <
+export const CHAR_ANGLE_BRACKET_CLOSE = 0x3e; // >
+export const CHAR_SQUARE_BRACKET_OPEN = 0x5b; // [
+export const CHAR_SQUARE_BRACKET_CLOSE = 0x5d; // ]
+export const CHAR_CURLY_BRACE_OPEN = 0x7b; // {
+export const CHAR_CURLY_BRACE_CLOSE = 0x7d; // }
+export const CHAR_SLASH = 0x2f; // /
+export const CHAR_PERCENT = 0x25; // %
+export const CHAR_BACKSLASH = 0x5c; // \
 
 /**
  * PDF delimiter characters (PDF spec 7.2.2)
@@ -41,16 +41,16 @@ export const BACKSLASH = 0x5c; // \
  * ( ) < > [ ] { } / %
  */
 export const DELIMITERS = new Set([
-  PARENTHESIS_OPEN,
-  PARENTHESIS_CLOSE,
-  ANGLE_BRACKET_OPEN,
-  ANGLE_BRACKET_CLOSE,
-  SQUARE_BRACKET_OPEN,
-  SQUARE_BRACKET_CLOSE,
-  CURLY_BRACE_OPEN,
-  CURLY_BRACE_CLOSE,
-  SLASH,
-  PERCENT,
+  CHAR_PARENTHESIS_OPEN,
+  CHAR_PARENTHESIS_CLOSE,
+  CHAR_ANGLE_BRACKET_OPEN,
+  CHAR_ANGLE_BRACKET_CLOSE,
+  CHAR_SQUARE_BRACKET_OPEN,
+  CHAR_SQUARE_BRACKET_CLOSE,
+  CHAR_CURLY_BRACE_OPEN,
+  CHAR_CURLY_BRACE_CLOSE,
+  CHAR_SLASH,
+  CHAR_PERCENT,
 ]);
 
 export const CHAR_PLUS = 0x2b; // +
