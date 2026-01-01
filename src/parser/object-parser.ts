@@ -7,6 +7,7 @@ import { PdfNull } from "#src/objects/pdf-null";
 import { PdfNumber } from "#src/objects/pdf-number";
 import { PdfRef } from "#src/objects/pdf-ref";
 import { PdfString } from "#src/objects/pdf-string";
+import { ObjectParseError } from "./errors";
 import type { Token } from "./token";
 import type { TokenReader } from "./token-reader";
 
@@ -58,7 +59,7 @@ export class ObjectParser {
   parseObject(): ParseResult | null {
     if (++this.depth > ObjectParser.MAX_DEPTH) {
       this.depth--;
-      throw new Error("Maximum nesting depth exceeded");
+      throw new ObjectParseError("Maximum nesting depth exceeded");
     }
 
     try {
@@ -112,7 +113,7 @@ export class ObjectParser {
     const token = this.buf1;
 
     if (token === null) {
-      throw new Error("Unexpected null token");
+      throw new ObjectParseError("Unexpected null token");
     }
 
     switch (token.type) {
@@ -137,7 +138,7 @@ export class ObjectParser {
         return this.parseDelimiter(token.value);
 
       default:
-        throw new Error(`Unexpected token type: ${token.type}`);
+        throw new ObjectParseError(`Unexpected token type: ${token.type}`);
     }
   }
 
@@ -155,7 +156,7 @@ export class ObjectParser {
         return { object: PdfBool.FALSE, hasStream: false };
 
       default:
-        throw new Error(`Unexpected keyword: ${value}`);
+        throw new ObjectParseError(`Unexpected keyword: ${value}`);
     }
   }
 
@@ -199,7 +200,7 @@ export class ObjectParser {
       if (this.recoveryMode) {
         this.warn(`Invalid reference values: ${objNum} ${genNum} R`);
       } else {
-        throw new Error(`Invalid reference values: ${objNum} ${genNum} R`);
+        throw new ObjectParseError(`Invalid reference values: ${objNum} ${genNum} R`);
       }
     }
 
@@ -221,10 +222,10 @@ export class ObjectParser {
 
       case "]":
       case ">>":
-        throw new Error(`Unexpected delimiter: ${value}`);
+        throw new ObjectParseError(`Unexpected delimiter: ${value}`);
 
       default:
-        throw new Error(`Unknown delimiter: ${value}`);
+        throw new ObjectParseError(`Unknown delimiter: ${value}`);
     }
   }
 
@@ -242,7 +243,7 @@ export class ObjectParser {
           break;
         }
 
-        throw new Error("Unterminated array at EOF");
+        throw new ObjectParseError("Unterminated array at EOF");
       }
 
       if (this.buf1.type === "delimiter" && this.buf1.value === "]") {
@@ -258,7 +259,7 @@ export class ObjectParser {
           break;
         }
 
-        throw new Error("Unexpected null in array");
+        throw new ObjectParseError("Unexpected null in array");
       }
 
       items.push(result.object);
@@ -281,7 +282,7 @@ export class ObjectParser {
           break;
         }
 
-        throw new Error("Unterminated dictionary at EOF");
+        throw new ObjectParseError("Unterminated dictionary at EOF");
       }
 
       if (this.buf1.type === "delimiter" && this.buf1.value === ">>") {
@@ -301,7 +302,7 @@ export class ObjectParser {
           continue;
         }
 
-        throw new Error(`Invalid dictionary key: expected name, got ${this.buf1.type}`);
+        throw new ObjectParseError(`Invalid dictionary key: expected name, got ${this.buf1.type}`);
       }
 
       const key = PdfName.of(this.buf1.value);
@@ -318,7 +319,7 @@ export class ObjectParser {
           continue;
         }
 
-        throw new Error(`Missing value for key ${key.value}`);
+        throw new ObjectParseError(`Missing value for key ${key.value}`);
       }
 
       // Parse value
@@ -330,7 +331,7 @@ export class ObjectParser {
           continue;
         }
 
-        throw new Error(`Missing value for key ${key.value}`);
+        throw new ObjectParseError(`Missing value for key ${key.value}`);
       }
 
       dict.set(key, valueResult.object);

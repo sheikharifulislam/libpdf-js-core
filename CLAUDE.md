@@ -38,6 +38,7 @@ checkouts/            # Reference library submodules (read-only)
   pdf-lib/            # pdf-lib - generation API reference
   pdfbox/             # Apache PDFBox - architecture reference
 .agents/              # AI agent working documents (see below)
+.docs/                # Local documentation (not committed, see below)
 ```
 
 ## Agent Working Documents (.agents/)
@@ -48,7 +49,7 @@ The `.agents/` directory contains documents for AI agent planning and decision-m
 |-------------|---------|-------------|
 | `GOALS.md` | High-level library goals and priorities | Check before starting new features; ensure work aligns with goals |
 | `ARCHITECTURE.md` | Current architecture documentation | Review before architectural changes; update after significant changes |
-| `plans/` | Implementation plans for features | Write plans here when asked to "write a plan" |
+| `plans/` | Implementation plans for features | Write plans here when asked to "write a plan" (use `NNN-name.md` format) |
 | `justifications/` | Decision rationale documents | Write here when asked to "justify" or explain a decision |
 | `scratch/` | Temporary notes and drafts | Use for work-in-progress that doesn't need to persist |
 
@@ -57,6 +58,25 @@ The `.agents/` directory contains documents for AI agent planning and decision-m
 - "Write a justification" → Create in `.agents/justifications/`
 - "Check/update goals" → Read/edit `.agents/GOALS.md`
 - "Review/update architecture" → Read/edit `.agents/ARCHITECTURE.md`
+
+## PDF Specification (.docs/)
+
+The `.docs/` directory contains local documentation that is **not committed** (gitignored for copyright reasons). When available:
+
+| Path | Contents |
+|------|----------|
+| `.docs/pdf-specification/pages.md` | PDF 1.7 specification in Markdown format |
+| `.docs/pdf-specification/images/` | Figures from the specification |
+
+**Usage**: When implementing PDF features, reference this spec for authoritative details on:
+- Object syntax (Chapter 7)
+- Document structure (Chapter 7.7)
+- Encryption (Chapter 7.6)
+- Content streams (Chapter 9)
+- Fonts (Chapter 9.6-9.10)
+- Annotations (Chapter 12.5)
+
+**Note**: This folder may not exist on all machines. If unavailable, fall back to the reference implementations in `checkouts/`.
 
 ## Design Principles
 

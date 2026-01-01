@@ -1,10 +1,22 @@
 import type { Scanner } from "#src/io/scanner";
 import type { PdfObject } from "#src/objects/object";
+import { PdfArray } from "#src/objects/pdf-array";
 import { PdfDict } from "#src/objects/pdf-dict";
 import { PdfNumber } from "#src/objects/pdf-number";
 import { PdfRef } from "#src/objects/pdf-ref";
-import type { PdfStream } from "#src/objects/pdf-stream";
+import { PdfStream } from "#src/objects/pdf-stream";
+import { PdfString } from "#src/objects/pdf-string";
+import { type CredentialInput, normalizeCredential } from "#src/security/credentials";
+import {
+  type EncryptionDict,
+  isEncryptedTrailer,
+  parseEncryptionDict,
+} from "#src/security/encryption-dict";
+import { EncryptionDictError } from "#src/security/errors";
+import type { Permissions } from "#src/security/permissions";
+import { StandardSecurityHandler, tryEmptyPassword } from "#src/security/standard-handler";
 import { BruteForceParser } from "./brute-force-parser";
+import { RecoverableParseError, StructureError, UnrecoverableParseError } from "./errors";
 import { IndirectObjectParser, type LengthResolver } from "./indirect-object-parser";
 import { ObjectStreamParser } from "./object-stream-parser";
 import { type XRefEntry, XRefParser } from "./xref-parser";
@@ -15,6 +27,18 @@ import { type XRefEntry, XRefParser } from "./xref-parser";
 export interface ParseOptions {
   /** Enable lenient parsing for malformed PDFs (default: true) */
   lenient?: boolean;
+
+  /**
+   * Credentials for encrypted documents.
+   *
+   * Accepts:
+   * - A plain string (shorthand for password credential)
+   * - A PasswordCredential object: `{ type: "password", password: "..." }`
+   * - A CertificateCredential object (future): `{ type: "certificate", ... }`
+   *
+   * If not provided, tries empty password for documents with owner-only encryption.
+   */
+  credentials?: CredentialInput;
 }
 
 /**
@@ -33,7 +57,34 @@ export interface ParsedDocument {
   /** Warnings encountered during parsing */
   warnings: string[];
 
-  /** Get an object by reference (with caching) */
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Encryption
+  // ─────────────────────────────────────────────────────────────────────────────
+
+  /** Whether the document is encrypted */
+  isEncrypted: boolean;
+
+  /** Encryption dictionary (if encrypted) */
+  encryption: EncryptionDict | null;
+
+  /** Whether authentication succeeded */
+  isAuthenticated: boolean;
+
+  /** Document permissions (if encrypted and authenticated) */
+  permissions: Permissions | null;
+
+  /**
+   * Authenticate with a password.
+   * Call this if initial authentication failed or to try a different password.
+   * @returns true if authentication succeeded
+   */
+  authenticate(password: string): boolean;
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Object access
+  // ─────────────────────────────────────────────────────────────────────────────
+
+  /** Get an object by reference (with caching and decryption) */
   getObject(ref: PdfRef): Promise<PdfObject | null>;
 
   /** Get the document catalog */
@@ -84,13 +135,14 @@ const HEADER_SEARCH_LIMIT = 1024;
  */
 export class DocumentParser {
   private readonly scanner: Scanner;
-  private readonly options: Required<ParseOptions>;
+  private readonly options: ParseOptions;
   private readonly warnings: string[] = [];
 
   constructor(scanner: Scanner, options: ParseOptions = {}) {
     this.scanner = scanner;
     this.options = {
       lenient: options.lenient ?? true,
+      credentials: options.credentials,
     };
   }
 
@@ -101,14 +153,14 @@ export class DocumentParser {
     try {
       return await this.parseNormal();
     } catch (error) {
-      if (this.options.lenient) {
-        const message = error instanceof Error ? error.message : String(error);
-
-        this.warnings.push(`Normal parsing failed: ${message}`);
+      // Only attempt recovery for recoverable parsing errors
+      if (this.options.lenient && error instanceof RecoverableParseError) {
+        this.warnings.push(`Normal parsing failed: ${error.message}`);
 
         return this.parseWithRecovery();
       }
 
+      // All other errors propagate (credentials, unsupported features, etc.)
       throw error;
     }
   }
@@ -151,7 +203,7 @@ export class DocumentParser {
     const result = await bruteForce.recover();
 
     if (result === null) {
-      throw new Error("Could not recover PDF structure: no objects found");
+      throw new UnrecoverableParseError("Could not recover PDF structure: no objects found");
     }
 
     this.warnings.push(...result.warnings);
@@ -213,7 +265,7 @@ export class DocumentParser {
         this.warnings.push("PDF header not found, using default version");
         return DEFAULT_VERSION;
       }
-      throw new Error("PDF header not found");
+      throw new StructureError("PDF header not found");
     }
 
     if (headerPos > 0) {
@@ -253,7 +305,7 @@ export class DocumentParser {
       return DEFAULT_VERSION;
     }
 
-    throw new Error(`Invalid PDF version: ${version}`);
+    throw new StructureError(`Invalid PDF version: ${version}`);
   }
 
   /**
@@ -317,7 +369,7 @@ export class DocumentParser {
     }
 
     if (!firstTrailer) {
-      throw new Error("No valid trailer found");
+      throw new StructureError("No valid trailer found");
     }
 
     return { xref: combinedXRef, trailer: firstTrailer };
@@ -336,6 +388,73 @@ export class DocumentParser {
 
     // Object stream cache: streamObjNum -> ObjectStreamParser
     const objectStreamCache = new Map<number, ObjectStreamParser>();
+
+    // ─────────────────────────────────────────────────────────────────────────────
+    // Encryption setup
+    // ─────────────────────────────────────────────────────────────────────────────
+
+    let securityHandler: StandardSecurityHandler | null = null;
+    let encryptionDict: EncryptionDict | null = null;
+
+    const isEncrypted = isEncryptedTrailer(trailer);
+
+    if (isEncrypted) {
+      try {
+        // Get /Encrypt dictionary
+        const encryptRef = trailer.getRef("Encrypt");
+
+        let encryptDictObj: PdfDict | null = null;
+
+        if (encryptRef) {
+          // Need to load the encrypt dict without decryption
+          const entry = xref.get(encryptRef.objectNumber);
+
+          if (entry?.type === "uncompressed") {
+            const parser = new IndirectObjectParser(this.scanner);
+            const result = parser.parseObjectAt(entry.offset);
+
+            if (result.value instanceof PdfDict) {
+              encryptDictObj = result.value;
+            }
+          }
+        } else {
+          // Direct dictionary (rare but valid)
+          encryptDictObj = trailer.getDict("Encrypt") ?? null;
+        }
+
+        if (encryptDictObj) {
+          encryptionDict = parseEncryptionDict(encryptDictObj);
+
+          // Get file ID from trailer
+          const fileId = this.getFileId(trailer);
+
+          if (fileId) {
+            securityHandler = new StandardSecurityHandler(encryptionDict, fileId);
+
+            // Try to authenticate
+            if (this.options.credentials !== undefined) {
+              const credential = normalizeCredential(this.options.credentials);
+              securityHandler.authenticateWithCredential(credential);
+            } else {
+              // Try empty password (common case for owner-only protection)
+              tryEmptyPassword(securityHandler);
+            }
+          } else {
+            this.warnings.push("Encrypted PDF missing /ID in trailer");
+          }
+        }
+      } catch (error) {
+        if (error instanceof EncryptionDictError) {
+          this.warnings.push(`Encryption error: ${error.message}`);
+        } else {
+          throw error;
+        }
+      }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────────
+    // Object loading
+    // ─────────────────────────────────────────────────────────────────────────────
 
     // Create length resolver for stream objects with indirect /Length
     const lengthResolver: LengthResolver = (ref: PdfRef) => {
@@ -370,6 +489,71 @@ export class DocumentParser {
       return null;
     };
 
+    /**
+     * Decrypt an object's strings and stream data.
+     */
+    const decryptObject = (obj: PdfObject, objNum: number, genNum: number): PdfObject => {
+      if (!securityHandler?.isAuthenticated) {
+        return obj;
+      }
+
+      if (obj instanceof PdfString) {
+        const decrypted = securityHandler.decryptString(obj.bytes, objNum, genNum);
+
+        return new PdfString(decrypted, obj.format);
+      }
+
+      if (obj instanceof PdfArray) {
+        const decryptedItems: PdfObject[] = [];
+
+        for (const item of obj) {
+          decryptedItems.push(decryptObject(item, objNum, genNum));
+        }
+
+        return new PdfArray(decryptedItems);
+      }
+
+      // Check PdfStream BEFORE PdfDict (PdfStream extends PdfDict)
+      if (obj instanceof PdfStream) {
+        // Check if this stream should be encrypted
+        const streamType = obj.getName("Type")?.value;
+
+        if (!securityHandler.shouldEncryptStream(streamType)) {
+          return obj;
+        }
+
+        // Decrypt stream data
+        const decryptedData = securityHandler.decryptStream(obj.data, objNum, genNum);
+
+        // Create new stream with decrypted data
+        // Copy dictionary entries (strings in dict will be decrypted when accessed)
+        const newStream = new PdfStream(obj, decryptedData);
+
+        // Decrypt strings in the dictionary entries
+        for (const [key, value] of obj) {
+          const decryptedValue = decryptObject(value, objNum, genNum);
+
+          if (decryptedValue !== value) {
+            newStream.set(key.value, decryptedValue);
+          }
+        }
+
+        return newStream;
+      }
+
+      if (obj instanceof PdfDict) {
+        const decryptedDict = new PdfDict();
+
+        for (const [key, value] of obj) {
+          decryptedDict.set(key.value, decryptObject(value, objNum, genNum));
+        }
+
+        return decryptedDict;
+      }
+
+      return obj;
+    };
+
     const getObject = async (ref: PdfRef): Promise<PdfObject | null> => {
       const key = `${ref.objectNumber} ${ref.generation}`;
 
@@ -381,6 +565,7 @@ export class DocumentParser {
 
       // Look up in xref
       const entry = xref.get(ref.objectNumber);
+
       if (!entry) {
         return null;
       }
@@ -405,6 +590,11 @@ export class DocumentParser {
 
           obj = result.value;
 
+          // Decrypt the object
+          if (securityHandler?.isAuthenticated) {
+            obj = decryptObject(obj, ref.objectNumber, ref.generation);
+          }
+
           break;
         }
 
@@ -428,6 +618,9 @@ export class DocumentParser {
           }
 
           obj = await streamParser.getObject(entry.indexInStream);
+
+          // Objects in object streams don't need individual decryption
+          // because the stream itself was decrypted
 
           break;
         }
@@ -537,16 +730,56 @@ export class DocumentParser {
       return pages.length;
     };
 
+    // Authentication function for re-authentication
+    const authenticate = (password: string): boolean => {
+      if (!securityHandler) {
+        return false;
+      }
+
+      const result = securityHandler.authenticateWithString(password);
+
+      return result.authenticated;
+    };
+
     return {
       version,
       trailer,
       xref,
       warnings: this.warnings,
+
+      // Encryption
+      isEncrypted,
+      encryption: encryptionDict,
+      isAuthenticated: securityHandler?.isAuthenticated ?? !isEncrypted,
+      permissions: securityHandler?.permissions ?? null,
+      authenticate,
+
+      // Object access
       getObject,
       getCatalog,
       getPageCount,
       getPages,
     };
+  }
+
+  /**
+   * Extract the file ID from the trailer's /ID array.
+   * Returns the first element of the array (the permanent file ID).
+   */
+  private getFileId(trailer: PdfDict): Uint8Array | null {
+    const idArray = trailer.getArray("ID");
+
+    if (!idArray || idArray.length < 1) {
+      return null;
+    }
+
+    const firstId = idArray.at(0);
+
+    if (firstId instanceof PdfString) {
+      return firstId.bytes;
+    }
+
+    return null;
   }
 
   /**

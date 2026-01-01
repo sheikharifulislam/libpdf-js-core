@@ -3,6 +3,7 @@ import type { Scanner } from "#src/io/scanner";
 import type { PdfDict } from "#src/objects/pdf-dict";
 import { PdfNumber } from "#src/objects/pdf-number";
 import { PdfStream } from "#src/objects/pdf-stream";
+import { XRefParseError } from "./errors";
 import { IndirectObjectParser } from "./indirect-object-parser";
 import { ObjectParser } from "./object-parser";
 import { TokenReader } from "./token-reader";
@@ -59,7 +60,7 @@ export class XRefParser {
     }
 
     if (startxrefPos === -1) {
-      throw new Error("Could not find startxref marker");
+      throw new XRefParseError("Could not find startxref marker");
     }
 
     // Skip "startxref" and whitespace to get the offset number
@@ -70,7 +71,7 @@ export class XRefParser {
     const offset = this.readIntegerAt(pos);
 
     if (offset === null) {
-      throw new Error("Invalid startxref offset");
+      throw new XRefParseError("Invalid startxref offset");
     }
 
     return offset;
@@ -96,7 +97,7 @@ export class XRefParser {
       return this.parseStream();
     }
 
-    throw new Error(`Unknown xref format at offset ${offset}`);
+    throw new XRefParseError(`Unknown xref format at offset ${offset}`);
   }
 
   /**
@@ -125,7 +126,7 @@ export class XRefParser {
     const result = parser.parseObject();
 
     if (result === null || !(result.object.type === "dict")) {
-      throw new Error("Invalid trailer dictionary");
+      throw new XRefParseError("Invalid trailer dictionary");
     }
 
     const trailer = result.object as PdfDict;
@@ -158,7 +159,7 @@ export class XRefParser {
     const indirectObj = parser.parseObject();
 
     if (!(indirectObj.value instanceof PdfStream)) {
-      throw new Error("Expected XRef stream object");
+      throw new XRefParseError("Expected XRef stream object");
     }
 
     const stream = indirectObj.value;
@@ -166,13 +167,13 @@ export class XRefParser {
     // Validate /Type is /XRef (optional per spec, but good to check)
     const type = stream.getName("Type");
     if (type !== undefined && type.value !== "XRef") {
-      throw new Error(`Expected /Type /XRef, got /Type /${type.value}`);
+      throw new XRefParseError(`Expected /Type /XRef, got /Type /${type.value}`);
     }
 
     // Get required /W array (field widths)
     const wArray = stream.getArray("W");
     if (wArray === undefined || wArray.length < 3) {
-      throw new Error("XRef stream missing or invalid /W array");
+      throw new XRefParseError("XRef stream missing or invalid /W array");
     }
 
     const w0 = wArray.at(0);
@@ -187,7 +188,7 @@ export class XRefParser {
     // Get /Size (total object count)
     const size = stream.getNumber("Size")?.value;
     if (size === undefined) {
-      throw new Error("XRef stream missing /Size");
+      throw new XRefParseError("XRef stream missing /Size");
     }
 
     // Get /Index array or default to [0 Size]
@@ -200,7 +201,7 @@ export class XRefParser {
         const countObj = indexArray.at(i + 1);
 
         if (!(firstObj instanceof PdfNumber) || !(countObj instanceof PdfNumber)) {
-          throw new Error("Invalid /Index array in XRef stream");
+          throw new XRefParseError("Invalid /Index array in XRef stream");
         }
 
         ranges.push({ first: firstObj.value, count: countObj.value });
@@ -222,7 +223,7 @@ export class XRefParser {
         const objNum = range.first + i;
 
         if (dataOffset + entrySize > decodedData.length) {
-          throw new Error("XRef stream data truncated");
+          throw new XRefParseError("XRef stream data truncated");
         }
 
         // Read type field (default to 1 if width is 0)
@@ -259,7 +260,7 @@ export class XRefParser {
             entry = { type: "compressed", streamObjNum: field2, indexInStream: field3 };
             break;
           default:
-            throw new Error(`Invalid XRef entry type: ${entryType}`);
+            throw new XRefParseError(`Invalid XRef entry type: ${entryType}`);
         }
 
         // Only store if not already present (first definition wins)
@@ -287,7 +288,7 @@ export class XRefParser {
     const firstObjNum = this.readIntegerFromCurrent();
 
     if (firstObjNum === null) {
-      throw new Error("Expected subsection start object number");
+      throw new XRefParseError("Expected subsection start object number");
     }
 
     this.skipWhitespaceFromCurrent();
@@ -295,7 +296,7 @@ export class XRefParser {
     const count = this.readIntegerFromCurrent();
 
     if (count === null) {
-      throw new Error("Expected subsection entry count");
+      throw new XRefParseError("Expected subsection entry count");
     }
 
     this.skipWhitespaceFromCurrent();
@@ -341,7 +342,7 @@ export class XRefParser {
         generation,
       };
     } else {
-      throw new Error(`Invalid xref entry type: ${String.fromCharCode(typeByte)}`);
+      throw new XRefParseError(`Invalid xref entry type: ${String.fromCharCode(typeByte)}`);
     }
   }
 
@@ -355,7 +356,7 @@ export class XRefParser {
       const byte = this.scanner.peek();
 
       if (byte < DIGIT_0 || byte > DIGIT_9) {
-        throw new Error(`Expected digit, got ${String.fromCharCode(byte)}`);
+        throw new XRefParseError(`Expected digit, got ${String.fromCharCode(byte)}`);
       }
 
       value = value * 10 + (byte - DIGIT_0);
@@ -512,7 +513,7 @@ export class XRefParser {
       const byte = this.scanner.peek();
 
       if (byte !== keyword.charCodeAt(i)) {
-        throw new Error(`Expected keyword "${keyword}"`);
+        throw new XRefParseError(`Expected keyword "${keyword}"`);
       }
 
       this.scanner.advance();

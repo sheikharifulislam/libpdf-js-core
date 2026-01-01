@@ -1,6 +1,7 @@
 import { Scanner } from "#src/io/scanner";
 import type { PdfObject } from "#src/objects/object";
 import type { PdfStream } from "#src/objects/pdf-stream";
+import { ObjectParseError } from "./errors";
 import { ObjectParser } from "./object-parser";
 import { TokenReader } from "./token-reader";
 
@@ -46,7 +47,7 @@ export class ObjectStreamParser {
     const type = stream.getName("Type");
 
     if (type?.value !== "ObjStm") {
-      throw new Error(`Expected /Type /ObjStm, got ${type?.value ?? "none"}`);
+      throw new ObjectParseError(`Expected /Type /ObjStm, got ${type?.value ?? "none"}`);
     }
 
     // Read required entries
@@ -54,11 +55,11 @@ export class ObjectStreamParser {
     const first = stream.getNumber("First");
 
     if (n === undefined) {
-      throw new Error("Object stream missing required /N entry");
+      throw new ObjectParseError("Object stream missing required /N entry");
     }
 
     if (first === undefined) {
-      throw new Error("Object stream missing required /First entry");
+      throw new ObjectParseError("Object stream missing required /First entry");
     }
 
     this.n = n.value;
@@ -89,7 +90,7 @@ export class ObjectStreamParser {
     const result: ObjectStreamEntry[] = [];
 
     if (this.decodedData === null) {
-      throw new Error("Decoded data not parsed");
+      throw new ObjectParseError("Decoded data not parsed");
     }
 
     // Create scanner for the index portion only
@@ -102,13 +103,13 @@ export class ObjectStreamParser {
       const offsetToken = reader.nextToken();
 
       if (objNumToken.type !== "number") {
-        throw new Error(
+        throw new ObjectParseError(
           `Invalid object stream index at entry ${i}: expected object number, got ${objNumToken.type}`,
         );
       }
 
       if (offsetToken.type !== "number") {
-        throw new Error(
+        throw new ObjectParseError(
           `Invalid object stream index at entry ${i}: expected offset, got ${offsetToken.type}`,
         );
       }
@@ -132,7 +133,7 @@ export class ObjectStreamParser {
     await this.parse();
 
     if (this.index === null) {
-      throw new Error("Index not parsed");
+      throw new ObjectParseError("Index not parsed");
     }
 
     if (index < 0 || index >= this.index.length) {
@@ -142,7 +143,7 @@ export class ObjectStreamParser {
     const entry = this.index[index];
 
     if (this.decodedData === null) {
-      throw new Error("Decoded data not parsed");
+      throw new ObjectParseError("Decoded data not parsed");
     }
 
     // Create scanner starting at the object's offset within the object section
@@ -168,7 +169,7 @@ export class ObjectStreamParser {
     await this.parse();
 
     if (this.index === null) {
-      throw new Error("Index not parsed");
+      throw new ObjectParseError("Index not parsed");
     }
 
     const result = new Map<number, PdfObject>();

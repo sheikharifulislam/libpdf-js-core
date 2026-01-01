@@ -4,6 +4,7 @@ import type { PdfObject } from "#src/objects/object";
 import type { PdfDict } from "#src/objects/pdf-dict";
 import type { PdfRef } from "#src/objects/pdf-ref";
 import { PdfStream } from "#src/objects/pdf-stream";
+import { ObjectParseError } from "./errors";
 import { ObjectParser } from "./object-parser";
 import { TokenReader } from "./token-reader";
 
@@ -44,7 +45,7 @@ export class IndirectObjectParser {
     const objNumToken = reader.nextToken();
 
     if (objNumToken.type !== "number" || !objNumToken.isInteger) {
-      throw new Error("Expected integer object number");
+      throw new ObjectParseError("Expected integer object number");
     }
 
     const objNum = objNumToken.value;
@@ -53,7 +54,7 @@ export class IndirectObjectParser {
     const genNumToken = reader.nextToken();
 
     if (genNumToken.type !== "number" || !genNumToken.isInteger) {
-      throw new Error("Expected integer generation number");
+      throw new ObjectParseError("Expected integer generation number");
     }
 
     const genNum = genNumToken.value;
@@ -62,7 +63,7 @@ export class IndirectObjectParser {
     const objKeyword = reader.nextToken();
 
     if (objKeyword.type !== "keyword" || objKeyword.value !== "obj") {
-      throw new Error(`Expected 'obj' keyword, got ${objKeyword.type}`);
+      throw new ObjectParseError(`Expected 'obj' keyword, got ${objKeyword.type}`);
     }
 
     // Parse the object value
@@ -70,7 +71,7 @@ export class IndirectObjectParser {
     const result = objectParser.parseObject();
 
     if (result === null) {
-      throw new Error("Expected object value");
+      throw new ObjectParseError("Expected object value");
     }
 
     let value: PdfObject;
@@ -155,7 +156,7 @@ export class IndirectObjectParser {
       const byte = this.scanner.peek();
 
       if (byte !== keyword.charCodeAt(i)) {
-        throw new Error(`Expected keyword "${keyword}"`);
+        throw new ObjectParseError(`Expected keyword "${keyword}"`);
       }
 
       this.scanner.advance();
@@ -223,7 +224,7 @@ export class IndirectObjectParser {
     const lengthObj = dict.get("Length");
 
     if (lengthObj === undefined) {
-      throw new Error("Stream missing required /Length entry");
+      throw new ObjectParseError("Stream missing required /Length entry");
     }
 
     // Direct number
@@ -236,7 +237,7 @@ export class IndirectObjectParser {
       const ref = lengthObj as PdfRef;
 
       if (!this.lengthResolver) {
-        throw new Error(
+        throw new ObjectParseError(
           `Cannot resolve indirect /Length reference ${ref.objectNumber} ${ref.generation} R: no resolver provided`,
         );
       }
@@ -244,7 +245,7 @@ export class IndirectObjectParser {
       const length = this.lengthResolver(ref);
 
       if (length === null) {
-        throw new Error(
+        throw new ObjectParseError(
           `Could not resolve /Length reference ${ref.objectNumber} ${ref.generation} R`,
         );
       }
@@ -252,6 +253,6 @@ export class IndirectObjectParser {
       return length;
     }
 
-    throw new Error(`Invalid /Length type: ${lengthObj.type}`);
+    throw new ObjectParseError(`Invalid /Length type: ${lengthObj.type}`);
   }
 }
