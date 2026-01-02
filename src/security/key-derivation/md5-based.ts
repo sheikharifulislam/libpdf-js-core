@@ -10,7 +10,7 @@
  */
 
 import { md5 } from "@noble/hashes/legacy.js";
-import { SINGLE_BYTE_MASK } from "#src/helpers/chars.ts";
+import { SINGLE_BYTE_MASK } from "#src/helpers/chars";
 import { RC4Cipher } from "../ciphers/rc4";
 
 /**

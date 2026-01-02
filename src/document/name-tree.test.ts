@@ -73,6 +73,7 @@ describe("NameTree", () => {
     it("uses binary search for lookup", async () => {
       // Create a sorted list of many entries
       const entries: PdfObject[] = [];
+
       for (let i = 0; i < 100; i++) {
         const key = `key${i.toString().padStart(3, "0")}`;
         entries.push(PdfString.fromString(key));

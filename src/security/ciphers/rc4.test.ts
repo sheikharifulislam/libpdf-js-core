@@ -243,7 +243,9 @@ describe("RC4Cipher", () => {
 
     it("should work with 128-bit (16 byte) key", () => {
       const key = new Uint8Array(16);
-      for (let i = 0; i < 16; i++) key[i] = i;
+      for (let i = 0; i < 16; i++) {
+        key[i] = i;
+      }
 
       const data = new TextEncoder().encode("PDF content with 128-bit encryption");
 
@@ -256,7 +258,9 @@ describe("RC4Cipher", () => {
     it("should handle binary data correctly", () => {
       const key = new Uint8Array([0xde, 0xad, 0xbe, 0xef, 0x42]);
       const binaryData = new Uint8Array(256);
-      for (let i = 0; i < 256; i++) binaryData[i] = i;
+      for (let i = 0; i < 256; i++) {
+        binaryData[i] = i;
+      }
 
       const encrypted = rc4(key, binaryData);
       const decrypted = rc4(key, encrypted);

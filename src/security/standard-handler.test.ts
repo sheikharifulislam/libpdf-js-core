@@ -27,7 +27,10 @@ function createR3Setup(
   const userPwd = new TextEncoder().encode(userPassword);
   const ownerPwd = new TextEncoder().encode(ownerPassword);
   const fileId = new Uint8Array(32);
-  for (let i = 0; i < 32; i++) fileId[i] = i;
+
+  for (let i = 0; i < 32; i++) {
+    fileId[i] = i;
+  }
 
   const keyLength = 16; // 128-bit
   const revision = 3;
@@ -72,7 +75,10 @@ function createR4Setup(
   const userPwd = new TextEncoder().encode(userPassword);
   const ownerPwd = new TextEncoder().encode(ownerPassword);
   const fileId = new Uint8Array(32);
-  for (let i = 0; i < 32; i++) fileId[i] = i;
+
+  for (let i = 0; i < 32; i++) {
+    fileId[i] = i;
+  }
 
   const keyLength = 16; // 128-bit
   const revision = 4;
@@ -117,13 +123,19 @@ function createR6Setup(
   const userPwd = new TextEncoder().encode(userPassword);
   const ownerPwd = new TextEncoder().encode(ownerPassword);
   const fileId = new Uint8Array(32);
-  for (let i = 0; i < 32; i++) fileId[i] = i;
+
+  for (let i = 0; i < 32; i++) {
+    fileId[i] = i;
+  }
 
   const permissionsRaw = encodePermissions(permissions);
 
   // Generate a random 256-bit file key
   const fileKey = new Uint8Array(32);
-  for (let i = 0; i < 32; i++) fileKey[i] = (i * 17) % 256;
+
+  for (let i = 0; i < 32; i++) {
+    fileKey[i] = (i * 17) % 256;
+  }
 
   const revision = 6;
 

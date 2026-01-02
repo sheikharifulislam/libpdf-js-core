@@ -1,5 +1,5 @@
 import { Scanner } from "#src/io/scanner";
-import type { PdfObject } from "#src/objects/pdf-object.ts";
+import type { PdfObject } from "#src/objects/pdf-object";
 import type { PdfStream } from "#src/objects/pdf-stream";
 import { ObjectParseError } from "./errors";
 import { ObjectParser } from "./object-parser";

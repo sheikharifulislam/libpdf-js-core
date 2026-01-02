@@ -301,9 +301,7 @@ describe("writeIncremental", () => {
     });
 
     // Original bytes should be preserved
-    for (let i = 0; i < originalLength; i++) {
-      expect(result.bytes[i]).toBe(bytes[i]);
-    }
+    expect(result.bytes.subarray(0, originalLength)).toEqual(bytes);
   });
 
   it("appends modified objects after original", async () => {
@@ -593,9 +591,7 @@ describe("round-trip", () => {
     });
 
     // Verify all original bytes preserved
-    for (let i = 0; i < result1.bytes.length; i++) {
-      expect(result3.bytes[i]).toBe(result1.bytes[i]);
-    }
+    expect(result3.bytes.subarray(0, result1.bytes.length)).toEqual(result1.bytes);
 
     // Verify has /Prev chain
     const text = new TextDecoder().decode(result3.bytes);

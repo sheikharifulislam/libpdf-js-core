@@ -10,10 +10,10 @@
 import { clearAllDirtyFlags, collectChanges } from "#src/document/change-collector";
 import type { ObjectRegistry } from "#src/document/object-registry";
 import { FilterPipeline } from "#src/filters/filter-pipeline";
-import { CR, LF } from "#src/helpers/chars.ts";
+import { CR, LF } from "#src/helpers/chars";
 import { ByteWriter } from "#src/io/byte-writer";
 import { PdfName } from "#src/objects/pdf-name";
-import type { PdfObject } from "#src/objects/pdf-object.ts";
+import type { PdfObject } from "#src/objects/pdf-object";
 import type { PdfRef } from "#src/objects/pdf-ref";
 import { PdfStream } from "#src/objects/pdf-stream";
 import { writeXRefStream, writeXRefTable, type XRefWriteEntry } from "./xref-writer";

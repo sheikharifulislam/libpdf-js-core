@@ -2,13 +2,18 @@
  * Test utilities for @libpdf/core
  */
 
-import { readFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 /**
  * Base path for test fixtures.
  */
 const FIXTURES_PATH = join(import.meta.dirname, "..", "fixtures");
+
+/**
+ * Base path for test output (gitignored).
+ */
+const TEST_OUTPUT_PATH = join(import.meta.dirname, "..", "test-output");
 
 /**
  * Fixture categories matching the fixtures directory structure.
@@ -198,4 +203,33 @@ export function getPdfVersion(bytes: Uint8Array) {
   const match = header.match(/%PDF-(\d+\.\d+)/);
 
   return match?.[1] ?? null;
+}
+
+/**
+ * Save test output to the test-output directory for manual inspection.
+ *
+ * The test-output directory is gitignored, so these files won't be committed.
+ * Useful for visually verifying PDF output in Preview.app or other viewers.
+ *
+ * @param filename - Output filename (can include subdirectories, e.g., "copy/page-copy.pdf")
+ * @param data - The data to write
+ *
+ * @example
+ * ```ts
+ * const savedBytes = await pdf.save();
+ * await saveTestOutput("copy-pages-test.pdf", savedBytes);
+ * // Then open test-output/copy-pages-test.pdf in Preview.app
+ * ```
+ */
+export async function saveTestOutput(filename: string, data: Uint8Array): Promise<string> {
+  const fullPath = join(TEST_OUTPUT_PATH, filename);
+  const dir = join(fullPath, "..");
+
+  // Ensure directory exists
+  await mkdir(dir, { recursive: true });
+
+  // Write the file
+  await writeFile(fullPath, data);
+
+  return fullPath;
 }

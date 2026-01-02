@@ -10,7 +10,7 @@
  */
 
 import type { PdfDict } from "#src/objects/pdf-dict";
-import { PdfNumber } from "#src/objects/pdf-number.ts";
+import { PdfNumber } from "#src/objects/pdf-number";
 
 /**
  * Linearization dictionary parameters.

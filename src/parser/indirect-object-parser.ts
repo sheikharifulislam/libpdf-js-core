@@ -1,7 +1,7 @@
 import { CR, LF, SPACE, TAB } from "#src/helpers/chars";
 import type { Scanner } from "#src/io/scanner";
 import type { PdfDict } from "#src/objects/pdf-dict";
-import type { PdfObject } from "#src/objects/pdf-object.ts";
+import type { PdfObject } from "#src/objects/pdf-object";
 import type { PdfRef } from "#src/objects/pdf-ref";
 import { PdfStream } from "#src/objects/pdf-stream";
 import { ObjectParseError } from "./errors";

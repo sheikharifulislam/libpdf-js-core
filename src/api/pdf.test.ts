@@ -86,6 +86,112 @@ describe("PDF", () => {
     });
   });
 
+  describe("page manipulation", () => {
+    it("addPage creates a new page with default size", async () => {
+      const bytes = await loadFixture("basic", "rot0.pdf");
+      const pdf = await PDF.load(bytes);
+      const originalCount = pdf.getPageCount();
+
+      const pageRef = pdf.addPage();
+
+      expect(pdf.getPageCount()).toBe(originalCount + 1);
+      expect(pdf.getPage(originalCount)).toBe(pageRef);
+
+      // Verify it's a valid page
+      const page = await pdf.getObject(pageRef);
+
+      expect(page).toBeInstanceOf(PdfDict);
+      expect((page as PdfDict).getName("Type")?.value).toBe("Page");
+    });
+
+    it("addPage respects size presets", async () => {
+      const bytes = await loadFixture("basic", "rot0.pdf");
+      const pdf = await PDF.load(bytes);
+
+      const pageRef = pdf.addPage({ size: "a4" });
+      const page = (await pdf.getObject(pageRef)) as PdfDict;
+      const mediaBox = page.getArray("MediaBox");
+
+      expect(mediaBox?.at(2)).toBeDefined();
+      // A4 width is ~595
+      expect((mediaBox?.at(2) as PdfNumber).value).toBeCloseTo(595.28, 1);
+    });
+
+    it("addPage respects landscape orientation", async () => {
+      const bytes = await loadFixture("basic", "rot0.pdf");
+      const pdf = await PDF.load(bytes);
+
+      const pageRef = pdf.addPage({ size: "letter", orientation: "landscape" });
+      const page = (await pdf.getObject(pageRef)) as PdfDict;
+      const mediaBox = page.getArray("MediaBox");
+
+      // Letter landscape: width=792, height=612
+      expect((mediaBox?.at(2) as PdfNumber).value).toBe(792);
+      expect((mediaBox?.at(3) as PdfNumber).value).toBe(612);
+    });
+
+    it("addPage respects insertAt option", async () => {
+      const bytes = await loadFixture("basic", "rot0.pdf");
+      const pdf = await PDF.load(bytes);
+      const firstPage = pdf.getPage(0);
+
+      const pageRef = pdf.addPage({ insertAt: 0 });
+
+      expect(pdf.getPage(0)).toBe(pageRef);
+      expect(pdf.getPage(1)).toBe(firstPage);
+    });
+
+    it("removePage removes a page", async () => {
+      const bytes = await loadFixture("basic", "rot0.pdf");
+      const pdf = await PDF.load(bytes);
+      const originalCount = pdf.getPageCount();
+      const secondPage = pdf.getPage(1);
+
+      const removed = pdf.removePage(0);
+
+      expect(pdf.getPageCount()).toBe(originalCount - 1);
+      expect(removed).not.toBe(secondPage);
+      expect(pdf.getPage(0)).toBe(secondPage);
+    });
+
+    it("removePage throws on out of bounds", async () => {
+      const bytes = await loadFixture("basic", "rot0.pdf");
+      const pdf = await PDF.load(bytes);
+
+      expect(() => pdf.removePage(100)).toThrow(RangeError);
+    });
+
+    it("movePage reorders pages", async () => {
+      const bytes = await loadFixture("basic", "rot0.pdf");
+      const pdf = await PDF.load(bytes);
+
+      // Add some pages to have enough to move
+      const page1 = pdf.addPage();
+      pdf.addPage(); // page2 - just need it to exist
+
+      // Move page1 to the end
+      const page1Index = pdf.getPages().indexOf(page1);
+      const lastIndex = pdf.getPageCount() - 1;
+      pdf.movePage(page1Index, lastIndex);
+
+      expect(pdf.getPage(lastIndex)).toBe(page1);
+    });
+
+    it("page modifications persist through save/load", async () => {
+      const bytes = await loadFixture("basic", "rot0.pdf");
+      const pdf1 = await PDF.load(bytes);
+      const originalCount = pdf1.getPageCount();
+
+      // Add a page
+      pdf1.addPage({ size: "a4" });
+
+      const saved = await pdf1.save();
+      const pdf2 = await PDF.load(saved);
+
+      expect(pdf2.getPageCount()).toBe(originalCount + 1);
+    });
+  });
+
   describe("modification tracking", () => {
     it("hasChanges returns false for unmodified doc", async () => {
       const bytes = await loadFixture("basic", "rot0.pdf");
@@ -211,9 +317,7 @@ describe("PDF", () => {
       expect(saved.length).toBeGreaterThan(originalLength);
 
       // Original bytes should be preserved
-      for (let i = 0; i < originalLength; i++) {
-        expect(saved[i]).toBe(bytes[i]);
-      }
+      expect(saved.subarray(0, originalLength)).toEqual(bytes);
     });
 
     it("incremental save includes /Prev pointer", async () => {
@@ -242,6 +346,140 @@ describe("PDF", () => {
 
       expect(saved.length).toBeGreaterThan(0);
       expect(pdf.warnings.some(w => w.includes("not possible"))).toBe(true);
+    });
+  });
+
+  describe("copyPagesFrom", () => {
+    it("copies and appends a single page from another document", async () => {
+      const sourceBytes = await loadFixture("basic", "document.pdf");
+      const source = await PDF.load(sourceBytes);
+
+      const destBytes = await loadFixture("basic", "sample.pdf");
+      const dest = await PDF.load(destBytes);
+
+      const destOriginalCount = dest.getPageCount();
+      const sourceCount = source.getPageCount();
+      expect(sourceCount).toBeGreaterThan(0);
+
+      const [copiedRef] = await dest.copyPagesFrom(source, [0]);
+
+      // Page is automatically inserted at the end
+      expect(dest.getPageCount()).toBe(destOriginalCount + 1);
+      expect(dest.getPage(destOriginalCount)).toBe(copiedRef);
+
+      // Verify it's a valid page
+      const copiedPage = await dest.getObject(copiedRef);
+      expect(copiedPage).toBeInstanceOf(PdfDict);
+      expect((copiedPage as PdfDict).getName("Type")?.value).toBe("Page");
+    });
+
+    it("copies multiple pages and appends them in order", async () => {
+      const sourceBytes = await loadFixture("basic", "document.pdf");
+      const source = await PDF.load(sourceBytes);
+
+      const destBytes = await loadFixture("basic", "sample.pdf");
+      const dest = await PDF.load(destBytes);
+
+      if (source.getPageCount() < 2) {
+        // Skip if source doesn't have enough pages
+        return;
+      }
+
+      const destOriginalCount = dest.getPageCount();
+      const copiedRefs = await dest.copyPagesFrom(source, [0, 1]);
+
+      expect(copiedRefs.length).toBe(2);
+      expect(dest.getPageCount()).toBe(destOriginalCount + 2);
+
+      // Pages inserted in order
+      expect(dest.getPage(destOriginalCount)).toBe(copiedRefs[0]);
+      expect(dest.getPage(destOriginalCount + 1)).toBe(copiedRefs[1]);
+    });
+
+    it("inserts at specified position with insertAt option", async () => {
+      const sourceBytes = await loadFixture("basic", "document.pdf");
+      const source = await PDF.load(sourceBytes);
+
+      const destBytes = await loadFixture("basic", "sample.pdf");
+      const dest = await PDF.load(destBytes);
+
+      const originalFirstPage = dest.getPage(0);
+
+      const [copiedRef] = await dest.copyPagesFrom(source, [0], { insertAt: 0 });
+
+      // Copied page is now first
+      expect(dest.getPage(0)).toBe(copiedRef);
+      // Original first page is now second
+      expect(dest.getPage(1)).toBe(originalFirstPage);
+    });
+
+    it("duplicates a page within the same document", async () => {
+      const bytes = await loadFixture("basic", "document.pdf");
+      const pdf = await PDF.load(bytes);
+      const originalCount = pdf.getPageCount();
+      const originalFirstPage = pdf.getPage(0);
+
+      // Duplicate page 0 and insert after it
+      const [duplicatedRef] = await pdf.copyPagesFrom(pdf, [0], { insertAt: 1 });
+
+      expect(pdf.getPageCount()).toBe(originalCount + 1);
+      expect(pdf.getPage(0)).toBe(originalFirstPage);
+      expect(pdf.getPage(1)).toBe(duplicatedRef);
+
+      // Refs should be different
+      expect(duplicatedRef).not.toBe(originalFirstPage);
+    });
+
+    it("throws RangeError for out of bounds index", async () => {
+      const sourceBytes = await loadFixture("basic", "document.pdf");
+      const source = await PDF.load(sourceBytes);
+
+      const destBytes = await loadFixture("basic", "sample.pdf");
+      const dest = await PDF.load(destBytes);
+
+      await expect(dest.copyPagesFrom(source, [999])).rejects.toThrow(RangeError);
+    });
+
+    it("throws RangeError for negative index", async () => {
+      const sourceBytes = await loadFixture("basic", "document.pdf");
+      const source = await PDF.load(sourceBytes);
+
+      const destBytes = await loadFixture("basic", "sample.pdf");
+      const dest = await PDF.load(destBytes);
+
+      await expect(dest.copyPagesFrom(source, [-1])).rejects.toThrow(RangeError);
+    });
+
+    it("copies persist through save/load", async () => {
+      const sourceBytes = await loadFixture("basic", "document.pdf");
+      const source = await PDF.load(sourceBytes);
+
+      const destBytes = await loadFixture("basic", "sample.pdf");
+      const dest = await PDF.load(destBytes);
+      const destOriginalCount = dest.getPageCount();
+
+      await dest.copyPagesFrom(source, [0]);
+
+      // Save and reload
+      const saved = await dest.save();
+      const reloaded = await PDF.load(saved);
+
+      expect(reloaded.getPageCount()).toBe(destOriginalCount + 1);
+    });
+
+    it("excludes annotations when option is false", async () => {
+      const sourceBytes = await loadFixture("basic", "SimpleForm2Fields.pdf");
+      const source = await PDF.load(sourceBytes);
+
+      const destBytes = await loadFixture("basic", "sample.pdf");
+      const dest = await PDF.load(destBytes);
+
+      const [copiedRef] = await dest.copyPagesFrom(source, [0], {
+        includeAnnotations: false,
+      });
+
+      const copiedPage = (await dest.getObject(copiedRef)) as PdfDict;
+      expect(copiedPage.has("Annots")).toBe(false);
     });
   });
 

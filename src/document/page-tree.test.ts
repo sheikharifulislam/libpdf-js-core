@@ -325,4 +325,305 @@ describe("PageTree", () => {
       expect(tree.getPage(0)).toBeNull();
     });
   });
+
+  describe("insertPage()", () => {
+    it("inserts at the beginning", async () => {
+      const page1Ref = PdfRef.of(3, 0);
+      const page1 = createPage();
+      const rootRef = PdfRef.of(1, 0);
+      const root = createPagesNode([page1Ref], 1);
+
+      const objects = new Map<string, PdfObject>([
+        ["1:0", root],
+        ["3:0", page1],
+      ]);
+
+      const tree = await PageTree.load(rootRef, createResolver(objects));
+
+      const newPageRef = PdfRef.of(10, 0);
+      const newPage = createPage();
+      tree.insertPage(0, newPageRef, newPage);
+
+      expect(tree.getPageCount()).toBe(2);
+      expect(tree.getPage(0)).toBe(newPageRef);
+      expect(tree.getPage(1)).toBe(page1Ref);
+
+      // Check that Parent was set
+      expect(newPage.getRef("Parent")).toBe(rootRef);
+
+      // Check that root Count was updated
+      expect(root.getNumber("Count")?.value).toBe(2);
+    });
+
+    it("inserts at the end", async () => {
+      const page1Ref = PdfRef.of(3, 0);
+      const page1 = createPage();
+      const rootRef = PdfRef.of(1, 0);
+      const root = createPagesNode([page1Ref], 1);
+
+      const objects = new Map<string, PdfObject>([
+        ["1:0", root],
+        ["3:0", page1],
+      ]);
+
+      const tree = await PageTree.load(rootRef, createResolver(objects));
+
+      const newPageRef = PdfRef.of(10, 0);
+      const newPage = createPage();
+      tree.insertPage(1, newPageRef, newPage);
+
+      expect(tree.getPageCount()).toBe(2);
+      expect(tree.getPage(0)).toBe(page1Ref);
+      expect(tree.getPage(1)).toBe(newPageRef);
+    });
+
+    it("inserts in the middle", async () => {
+      const page1Ref = PdfRef.of(3, 0);
+      const page2Ref = PdfRef.of(4, 0);
+      const rootRef = PdfRef.of(1, 0);
+      const root = createPagesNode([page1Ref, page2Ref], 2);
+
+      const objects = new Map<string, PdfObject>([
+        ["1:0", root],
+        ["3:0", createPage()],
+        ["4:0", createPage()],
+      ]);
+
+      const tree = await PageTree.load(rootRef, createResolver(objects));
+
+      const newPageRef = PdfRef.of(10, 0);
+      const newPage = createPage();
+      tree.insertPage(1, newPageRef, newPage);
+
+      expect(tree.getPageCount()).toBe(3);
+      expect(tree.getPage(0)).toBe(page1Ref);
+      expect(tree.getPage(1)).toBe(newPageRef);
+      expect(tree.getPage(2)).toBe(page2Ref);
+    });
+
+    it("normalizes negative index to append", async () => {
+      const page1Ref = PdfRef.of(3, 0);
+      const rootRef = PdfRef.of(1, 0);
+      const root = createPagesNode([page1Ref], 1);
+
+      const objects = new Map<string, PdfObject>([
+        ["1:0", root],
+        ["3:0", createPage()],
+      ]);
+
+      const tree = await PageTree.load(rootRef, createResolver(objects));
+
+      const newPageRef = PdfRef.of(10, 0);
+      const newPage = createPage();
+      tree.insertPage(-1, newPageRef, newPage);
+
+      expect(tree.getPageCount()).toBe(2);
+      expect(tree.getPage(1)).toBe(newPageRef);
+    });
+
+    it("generates warning on first modification (flattening)", async () => {
+      const page1Ref = PdfRef.of(3, 0);
+      const rootRef = PdfRef.of(1, 0);
+      const root = createPagesNode([page1Ref], 1);
+
+      const objects = new Map<string, PdfObject>([
+        ["1:0", root],
+        ["3:0", createPage()],
+      ]);
+
+      const tree = await PageTree.load(rootRef, createResolver(objects));
+
+      expect(tree.warnings.length).toBe(0);
+
+      const newPageRef = PdfRef.of(10, 0);
+      tree.insertPage(0, newPageRef, createPage());
+
+      expect(tree.warnings.length).toBe(1);
+      expect(tree.warnings[0]).toContain("flattened");
+    });
+  });
+
+  describe("removePage()", () => {
+    it("removes first page", async () => {
+      const page1Ref = PdfRef.of(3, 0);
+      const page2Ref = PdfRef.of(4, 0);
+      const rootRef = PdfRef.of(1, 0);
+      const root = createPagesNode([page1Ref, page2Ref], 2);
+
+      const objects = new Map<string, PdfObject>([
+        ["1:0", root],
+        ["3:0", createPage()],
+        ["4:0", createPage()],
+      ]);
+
+      const tree = await PageTree.load(rootRef, createResolver(objects));
+
+      const removed = tree.removePage(0);
+
+      expect(removed).toBe(page1Ref);
+      expect(tree.getPageCount()).toBe(1);
+      expect(tree.getPage(0)).toBe(page2Ref);
+      expect(root.getNumber("Count")?.value).toBe(1);
+    });
+
+    it("removes last page", async () => {
+      const page1Ref = PdfRef.of(3, 0);
+      const page2Ref = PdfRef.of(4, 0);
+      const rootRef = PdfRef.of(1, 0);
+      const root = createPagesNode([page1Ref, page2Ref], 2);
+
+      const objects = new Map<string, PdfObject>([
+        ["1:0", root],
+        ["3:0", createPage()],
+        ["4:0", createPage()],
+      ]);
+
+      const tree = await PageTree.load(rootRef, createResolver(objects));
+
+      const removed = tree.removePage(1);
+
+      expect(removed).toBe(page2Ref);
+      expect(tree.getPageCount()).toBe(1);
+      expect(tree.getPage(0)).toBe(page1Ref);
+    });
+
+    it("removes only page (results in 0 pages)", async () => {
+      const page1Ref = PdfRef.of(3, 0);
+      const rootRef = PdfRef.of(1, 0);
+      const root = createPagesNode([page1Ref], 1);
+
+      const objects = new Map<string, PdfObject>([
+        ["1:0", root],
+        ["3:0", createPage()],
+      ]);
+
+      const tree = await PageTree.load(rootRef, createResolver(objects));
+
+      tree.removePage(0);
+
+      expect(tree.getPageCount()).toBe(0);
+      expect(root.getNumber("Count")?.value).toBe(0);
+    });
+
+    it("throws RangeError for out of bounds index", async () => {
+      const page1Ref = PdfRef.of(3, 0);
+      const rootRef = PdfRef.of(1, 0);
+      const root = createPagesNode([page1Ref], 1);
+
+      const objects = new Map<string, PdfObject>([
+        ["1:0", root],
+        ["3:0", createPage()],
+      ]);
+
+      const tree = await PageTree.load(rootRef, createResolver(objects));
+
+      expect(() => tree.removePage(5)).toThrow(RangeError);
+      expect(() => tree.removePage(-1)).toThrow(RangeError);
+    });
+
+    it("throws RangeError on empty tree", () => {
+      const tree = PageTree.empty();
+
+      expect(() => tree.removePage(0)).toThrow(RangeError);
+    });
+  });
+
+  describe("movePage()", () => {
+    it("moves page forward", async () => {
+      const page1Ref = PdfRef.of(3, 0);
+      const page2Ref = PdfRef.of(4, 0);
+      const page3Ref = PdfRef.of(5, 0);
+      const rootRef = PdfRef.of(1, 0);
+      const root = createPagesNode([page1Ref, page2Ref, page3Ref], 3);
+
+      const objects = new Map<string, PdfObject>([
+        ["1:0", root],
+        ["3:0", createPage()],
+        ["4:0", createPage()],
+        ["5:0", createPage()],
+      ]);
+
+      const tree = await PageTree.load(rootRef, createResolver(objects));
+
+      tree.movePage(0, 2);
+
+      expect(tree.getPages()).toEqual([page2Ref, page3Ref, page1Ref]);
+      // Count should be unchanged
+      expect(root.getNumber("Count")?.value).toBe(3);
+    });
+
+    it("moves page backward", async () => {
+      const page1Ref = PdfRef.of(3, 0);
+      const page2Ref = PdfRef.of(4, 0);
+      const page3Ref = PdfRef.of(5, 0);
+      const rootRef = PdfRef.of(1, 0);
+      const root = createPagesNode([page1Ref, page2Ref, page3Ref], 3);
+
+      const objects = new Map<string, PdfObject>([
+        ["1:0", root],
+        ["3:0", createPage()],
+        ["4:0", createPage()],
+        ["5:0", createPage()],
+      ]);
+
+      const tree = await PageTree.load(rootRef, createResolver(objects));
+
+      tree.movePage(2, 0);
+
+      expect(tree.getPages()).toEqual([page3Ref, page1Ref, page2Ref]);
+    });
+
+    it("is a no-op when fromIndex equals toIndex", async () => {
+      const page1Ref = PdfRef.of(3, 0);
+      const page2Ref = PdfRef.of(4, 0);
+      const rootRef = PdfRef.of(1, 0);
+      const root = createPagesNode([page1Ref, page2Ref], 2);
+
+      const objects = new Map<string, PdfObject>([
+        ["1:0", root],
+        ["3:0", createPage()],
+        ["4:0", createPage()],
+      ]);
+
+      const tree = await PageTree.load(rootRef, createResolver(objects));
+
+      // Should not generate warning since no actual modification
+      tree.movePage(1, 1);
+
+      expect(tree.getPages()).toEqual([page1Ref, page2Ref]);
+      expect(tree.warnings.length).toBe(0);
+    });
+
+    it("throws RangeError for out of bounds fromIndex", async () => {
+      const page1Ref = PdfRef.of(3, 0);
+      const rootRef = PdfRef.of(1, 0);
+      const root = createPagesNode([page1Ref], 1);
+
+      const objects = new Map<string, PdfObject>([
+        ["1:0", root],
+        ["3:0", createPage()],
+      ]);
+
+      const tree = await PageTree.load(rootRef, createResolver(objects));
+
+      expect(() => tree.movePage(5, 0)).toThrow(RangeError);
+      expect(() => tree.movePage(-1, 0)).toThrow(RangeError);
+    });
+
+    it("throws RangeError for out of bounds toIndex", async () => {
+      const page1Ref = PdfRef.of(3, 0);
+      const rootRef = PdfRef.of(1, 0);
+      const root = createPagesNode([page1Ref], 1);
+
+      const objects = new Map<string, PdfObject>([
+        ["1:0", root],
+        ["3:0", createPage()],
+      ]);
+
+      const tree = await PageTree.load(rootRef, createResolver(objects));
+
+      expect(() => tree.movePage(0, 5)).toThrow(RangeError);
+      expect(() => tree.movePage(0, -1)).toThrow(RangeError);
+    });
+  });
 });

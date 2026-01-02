@@ -444,7 +444,9 @@ describe("known test vectors", () => {
 
     const password = new TextEncoder().encode("test");
     const fileId = new Uint8Array(32);
-    for (let i = 0; i < 32; i++) fileId[i] = i;
+    for (let i = 0; i < 32; i++) {
+      fileId[i] = i;
+    }
 
     const keyLength = 16;
     const revision = 3;

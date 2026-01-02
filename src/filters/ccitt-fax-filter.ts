@@ -1,4 +1,4 @@
-import { SINGLE_BYTE_MASK } from "#src/helpers/chars.ts";
+import { SINGLE_BYTE_MASK } from "#src/helpers/chars";
 import type { PdfDict } from "#src/objects/pdf-dict";
 import type { Filter } from "./filter";
 

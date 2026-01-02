@@ -124,7 +124,9 @@ describe("AES-CBC encryption", () => {
     it("should work with padding disabled for block-aligned data", () => {
       // Exactly 32 bytes (2 blocks)
       const plaintext = new Uint8Array(32);
-      for (let i = 0; i < 32; i++) plaintext[i] = i;
+      for (let i = 0; i < 32; i++) {
+        plaintext[i] = i;
+      }
 
       const ciphertext = aesEncryptWithIv(key128, fixedIv, plaintext, true);
       expect(ciphertext.length).toBe(32); // No padding added
@@ -208,7 +210,9 @@ describe("AES-ECB encryption", () => {
 
     it("should round-trip with AES-256", () => {
       const block = new Uint8Array(16);
-      for (let i = 0; i < 16; i++) block[i] = i * 17;
+      for (let i = 0; i < 16; i++) {
+        block[i] = i * 17;
+      }
 
       const encrypted = aesEcbEncrypt(key256, block);
       const decrypted = aesEcbDecrypt(key256, encrypted);
@@ -291,7 +295,9 @@ describe("PDF encryption scenarios", () => {
     it("should handle typical PDF stream encryption", () => {
       // Simulate PDF R4 stream encryption
       const key = new Uint8Array(16); // Object-specific key
-      for (let i = 0; i < 16; i++) key[i] = i;
+      for (let i = 0; i < 16; i++) {
+        key[i] = i;
+      }
 
       // Simulate a stream content
       const streamContent = new TextEncoder().encode("BT /F1 12 Tf 100 700 Td (Hello World) Tj ET");
@@ -312,7 +318,9 @@ describe("PDF encryption scenarios", () => {
     it("should encrypt/decrypt 16-byte Perms block", () => {
       // AES-256 key for R6
       const key = new Uint8Array(32);
-      for (let i = 0; i < 32; i++) key[i] = i;
+      for (let i = 0; i < 32; i++) {
+        key[i] = i;
+      }
 
       // Perms entry format: permissions (4) + "adb" + encrypted metadata flag + random (4)
       const perms = new Uint8Array([

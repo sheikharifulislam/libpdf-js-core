@@ -68,6 +68,14 @@ export class PdfArray implements PdfPrimitive {
   }
 
   /**
+   * Insert item at index, shifting subsequent items.
+   */
+  insert(index: number, value: PdfObject): void {
+    this.items.splice(index, 0, value);
+    this.dirty = true;
+  }
+
+  /**
    * Remove item at index, shifting subsequent items.
    */
   remove(index: number): void {

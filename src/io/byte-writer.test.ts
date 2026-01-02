@@ -192,9 +192,7 @@ describe("ByteWriter", () => {
       const result = writer.toBytes();
       expect(result.length).toBe(100);
 
-      for (let i = 0; i < 100; i++) {
-        expect(result[i]).toBe(i);
-      }
+      expect(result.every((b, i) => b === i)).toBe(true);
     });
 
     it("grows when writing large chunk", () => {
@@ -325,9 +323,7 @@ describe("ByteWriter", () => {
       expect(result.length).toBe(1024 * 1024);
 
       // Verify pattern
-      for (let i = 0; i < result.length; i++) {
-        expect(result[i]).toBe(i % 256);
-      }
+      expect(result.every((b, i) => b === i % 256)).toBe(true);
     });
 
     it("handles many small writes", () => {

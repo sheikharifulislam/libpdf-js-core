@@ -13,7 +13,7 @@
 
 import { randomBytes } from "@noble/ciphers/utils.js";
 import { sha256, sha384, sha512 } from "@noble/hashes/sha2.js";
-import { SINGLE_BYTE_MASK } from "#src/helpers/chars.ts";
+import { SINGLE_BYTE_MASK } from "#src/helpers/chars";
 import { aesDecryptWithIv, aesEcbDecrypt, aesEcbEncrypt, aesEncryptWithIv } from "../ciphers/aes";
 
 /** Maximum password length for R5-R6 (UTF-8 bytes) */

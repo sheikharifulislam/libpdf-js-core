@@ -155,7 +155,9 @@ describe("verifyUserPasswordR56", () => {
   it("should verify correct user password (R5)", () => {
     const password = new TextEncoder().encode("userpass");
     const fileKey = new Uint8Array(32);
-    for (let i = 0; i < 32; i++) fileKey[i] = i;
+    for (let i = 0; i < 32; i++) {
+      fileKey[i] = i;
+    }
 
     // Generate entries
     const { u, ue } = generateUserEntries(password, fileKey, 5);
@@ -170,7 +172,9 @@ describe("verifyUserPasswordR56", () => {
   it("should verify correct user password (R6)", () => {
     const password = new TextEncoder().encode("r6password");
     const fileKey = new Uint8Array(32);
-    for (let i = 0; i < 32; i++) fileKey[i] = 0xff - i;
+    for (let i = 0; i < 32; i++) {
+      fileKey[i] = 0xff - i;
+    }
 
     const { u, ue } = generateUserEntries(password, fileKey, 6);
     const result = verifyUserPasswordR56(password, u, ue, 6);
@@ -208,7 +212,9 @@ describe("verifyOwnerPasswordR56", () => {
     const userPassword = new TextEncoder().encode("user");
     const ownerPassword = new TextEncoder().encode("owner");
     const fileKey = new Uint8Array(32);
-    for (let i = 0; i < 32; i++) fileKey[i] = i;
+    for (let i = 0; i < 32; i++) {
+      fileKey[i] = i;
+    }
 
     // Generate user entries first (needed for owner)
     const { u } = generateUserEntries(userPassword, fileKey, 5);
@@ -297,7 +303,9 @@ describe("generatePermsEntry", () => {
 
   it("should be verifiable after generation", () => {
     const fileKey = new Uint8Array(32);
-    for (let i = 0; i < 32; i++) fileKey[i] = i;
+    for (let i = 0; i < 32; i++) {
+      fileKey[i] = i;
+    }
 
     const permissions = -3904;
     const encryptMetadata = true;
@@ -349,7 +357,9 @@ describe("full round-trip tests", () => {
     const userPassword = new TextEncoder().encode("user123");
     const ownerPassword = new TextEncoder().encode("owner456");
     const fileKey = new Uint8Array(32);
-    for (let i = 0; i < 32; i++) fileKey[i] = i * 8;
+    for (let i = 0; i < 32; i++) {
+      fileKey[i] = i * 8;
+    }
 
     const revision = 5;
 
@@ -375,7 +385,9 @@ describe("full round-trip tests", () => {
     const userPassword = new TextEncoder().encode("SecureUser!");
     const ownerPassword = new TextEncoder().encode("EvenMoreSecureOwner!");
     const fileKey = new Uint8Array(32);
-    for (let i = 0; i < 32; i++) fileKey[i] = 0xff - i;
+    for (let i = 0; i < 32; i++) {
+      fileKey[i] = 0xff - i;
+    }
 
     const revision = 6;
     const permissions = -3904;

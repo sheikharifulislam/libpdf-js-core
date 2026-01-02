@@ -20,12 +20,16 @@ import {
   isLinearizationDict,
 } from "#src/document/linearization";
 import { buildNameTree, NameTree } from "#src/document/name-tree";
+import { ObjectCopier } from "#src/document/object-copier";
 import { ObjectRegistry } from "#src/document/object-registry";
 import { PageTree } from "#src/document/page-tree";
+import { resolvePageSize } from "#src/helpers/page-size";
 import { Scanner } from "#src/io/scanner";
 import { PdfArray } from "#src/objects/pdf-array";
 import { PdfDict } from "#src/objects/pdf-dict";
-import type { PdfObject } from "#src/objects/pdf-object.ts";
+import { PdfName } from "#src/objects/pdf-name";
+import { PdfNumber } from "#src/objects/pdf-number";
+import type { PdfObject } from "#src/objects/pdf-object";
 import { PdfRef } from "#src/objects/pdf-ref";
 import { PdfStream } from "#src/objects/pdf-stream";
 import {
@@ -52,6 +56,40 @@ export interface SaveOptions {
 
   /** Use XRef stream instead of table. Default: matches original format */
   useXRefStream?: boolean;
+}
+
+/**
+ * Options for adding a new page.
+ */
+export interface AddPageOptions {
+  /** Page width in points (default: 612 = US Letter) */
+  width?: number;
+  /** Page height in points (default: 792 = US Letter) */
+  height?: number;
+  /** Use a preset size */
+  size?: "letter" | "a4" | "legal";
+  /** Page orientation (default: "portrait") */
+  orientation?: "portrait" | "landscape";
+  /** Rotation in degrees (0, 90, 180, 270) */
+  rotate?: number;
+  /** Insert at index instead of appending */
+  insertAt?: number;
+}
+
+/**
+ * Options for copying pages from another document.
+ */
+export interface CopyPagesOptions {
+  /** Insert copied pages at this index (default: append to end) */
+  insertAt?: number;
+  /** Include annotations (default: true) */
+  includeAnnotations?: boolean;
+  /** Include article thread beads (default: false) */
+  includeBeads?: boolean;
+  /** Include thumbnail images (default: false) */
+  includeThumbnails?: boolean;
+  /** Include structure tree references (default: false) */
+  includeStructure?: boolean;
 }
 
 /**
@@ -252,6 +290,177 @@ export class PDF {
    */
   getPage(index: number): PdfRef | null {
     return this._pages.getPage(index);
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Page manipulation
+  // ─────────────────────────────────────────────────────────────────────────────
+
+  /**
+   * Add a new blank page.
+   *
+   * @param options Page size, rotation, and insertion position
+   * @returns The reference to the new page
+   */
+  addPage(options: AddPageOptions = {}): PdfRef {
+    const { width, height } = resolvePageSize(options);
+    const rotate = options.rotate ?? 0;
+
+    // Create minimal page dict
+    const page = PdfDict.of({
+      Type: PdfName.Page,
+      MediaBox: new PdfArray([
+        PdfNumber.of(0),
+        PdfNumber.of(0),
+        PdfNumber.of(width),
+        PdfNumber.of(height),
+      ]),
+      Resources: new PdfDict(),
+    });
+
+    if (rotate !== 0) {
+      page.set("Rotate", PdfNumber.of(rotate));
+    }
+
+    // Register the page
+    const pageRef = this.register(page);
+
+    // Insert at specified position or append
+    const index = options.insertAt ?? this.getPageCount();
+    this._pages.insertPage(index, pageRef, page);
+
+    return pageRef;
+  }
+
+  /**
+   * Insert an existing page at the given index.
+   *
+   * @param index Position to insert (0 = first, negative = append)
+   * @param page The page dict or ref to insert
+   * @returns The page reference
+   */
+  insertPage(index: number, page: PdfDict | PdfRef): PdfRef {
+    let pageRef: PdfRef;
+    let pageDict: PdfDict;
+
+    if (page instanceof PdfRef) {
+      pageRef = page;
+      // Get the dict from registry or throw
+      const obj = this.registry.getObject(page);
+
+      if (!(obj instanceof PdfDict)) {
+        throw new Error("Page reference does not point to a dictionary");
+      }
+
+      pageDict = obj;
+    } else {
+      // Register the dict and get a ref
+      pageRef = this.register(page);
+      pageDict = page;
+    }
+
+    this._pages.insertPage(index, pageRef, pageDict);
+
+    return pageRef;
+  }
+
+  /**
+   * Remove the page at the given index.
+   *
+   * @param index The page index to remove
+   * @returns The removed page reference
+   * @throws RangeError if index is out of bounds
+   */
+  removePage(index: number): PdfRef {
+    return this._pages.removePage(index);
+  }
+
+  /**
+   * Move a page from one position to another.
+   *
+   * @param fromIndex The current page index
+   * @param toIndex The target page index
+   * @throws RangeError if either index is out of bounds
+   */
+  movePage(fromIndex: number, toIndex: number): void {
+    this._pages.movePage(fromIndex, toIndex);
+  }
+
+  /**
+   * Copy pages from another PDF document.
+   *
+   * This method deep-copies pages and all their resources (fonts, images, etc.)
+   * from the source document into this document and inserts them at the
+   * specified position (or appends to the end by default).
+   *
+   * Works with same-document copying for page duplication.
+   *
+   * @param source The source PDF document
+   * @param indices Array of page indices to copy (0-based)
+   * @param options Copy options including insertion position
+   * @returns Array of references to the copied pages in this document
+   * @throws RangeError if any source page index is out of bounds
+   *
+   * @example
+   * ```typescript
+   * // Copy pages 0 and 2 from source, append to end
+   * const copiedRefs = await dest.copyPagesFrom(source, [0, 2]);
+   *
+   * // Copy page 0 and insert at the beginning
+   * await dest.copyPagesFrom(source, [0], { insertAt: 0 });
+   *
+   * // Duplicate page 0 in the same document, insert after it
+   * await pdf.copyPagesFrom(pdf, [0], { insertAt: 1 });
+   * ```
+   */
+  async copyPagesFrom(
+    source: PDF,
+    indices: number[],
+    options: CopyPagesOptions = {},
+  ): Promise<PdfRef[]> {
+    const copier = new ObjectCopier(source, this, {
+      includeAnnotations: options.includeAnnotations ?? true,
+      includeBeads: options.includeBeads ?? false,
+      includeThumbnails: options.includeThumbnails ?? false,
+      includeStructure: options.includeStructure ?? false,
+    });
+
+    const copiedRefs: PdfRef[] = [];
+
+    // Fail-fast: validate all indices first
+    for (const index of indices) {
+      if (index < 0 || index >= source.getPageCount()) {
+        throw new RangeError(`Page index ${index} out of bounds (0-${source.getPageCount() - 1})`);
+      }
+    }
+
+    // Copy each page
+    for (const index of indices) {
+      const srcPageRef = source.getPage(index);
+
+      if (!srcPageRef) {
+        throw new Error(`Source page ${index} not found`);
+      }
+
+      const copiedPageRef = await copier.copyPage(srcPageRef);
+      copiedRefs.push(copiedPageRef);
+    }
+
+    // Insert copied pages at specified position (or append)
+    let insertIndex = options.insertAt ?? this.getPageCount();
+
+    for (const copiedRef of copiedRefs) {
+      const copiedPage = await this.getObject(copiedRef);
+
+      if (!(copiedPage instanceof PdfDict)) {
+        throw new Error("Copied page is not a dictionary");
+      }
+
+      this._pages.insertPage(insertIndex, copiedRef, copiedPage);
+      insertIndex++;
+    }
+
+    return copiedRefs;
   }
 
   // ─────────────────────────────────────────────────────────────────────────────

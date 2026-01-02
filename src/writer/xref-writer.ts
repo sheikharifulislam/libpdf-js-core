@@ -5,7 +5,7 @@
  * xref streams (PDF 1.5+).
  */
 
-import { SINGLE_BYTE_MASK } from "#src/helpers/chars.ts";
+import { SINGLE_BYTE_MASK } from "#src/helpers/chars";
 import type { ByteWriter } from "#src/io/byte-writer";
 import { PdfArray } from "#src/objects/pdf-array";
 import { PdfDict } from "#src/objects/pdf-dict";

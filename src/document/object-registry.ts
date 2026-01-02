@@ -5,7 +5,7 @@
  * tracks new objects, and assigns object numbers.
  */
 
-import type { PdfObject } from "#src/objects/pdf-object.ts";
+import type { PdfObject } from "#src/objects/pdf-object";
 import { PdfRef } from "#src/objects/pdf-ref";
 import type { XRefEntry } from "#src/parser/xref-parser";
 

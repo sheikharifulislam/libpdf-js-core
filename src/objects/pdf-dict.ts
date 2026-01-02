@@ -148,6 +148,20 @@ export class PdfDict implements PdfPrimitive {
   }
 
   /**
+   * Create a shallow clone of this dictionary.
+   * Values are shared, not deep-copied.
+   */
+  clone(): PdfDict {
+    const cloned = new PdfDict();
+
+    for (const [key, value] of this.entries) {
+      cloned.entries.set(key, value);
+    }
+
+    return cloned;
+  }
+
+  /**
    * Create dict from entries.
    */
   static of(entries: Record<string, PdfObject>): PdfDict {
