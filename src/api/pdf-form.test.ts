@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { TerminalField } from "#src/document/form-field";
+import type { TerminalField } from "#src/document/forms/fields";
 import { loadFixture } from "#src/test-utils";
 import { PDF } from "./pdf";
 import { TextAlignment } from "./pdf-form";

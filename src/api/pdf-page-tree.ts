@@ -13,7 +13,7 @@ import { PdfRef } from "#src/objects/pdf-ref";
  * Supports modification operations (insert, remove, move) which
  * flatten the tree structure on first mutation.
  */
-export class PageTree {
+export class PDFPageTree {
   /** Reference to the root /Pages dict */
   private readonly rootRef: PdfRef;
 
@@ -51,7 +51,7 @@ export class PageTree {
   static async load(
     pagesRef: PdfRef,
     getObject: (ref: PdfRef) => Promise<PdfObject | null>,
-  ): Promise<PageTree> {
+  ): Promise<PDFPageTree> {
     const pages: PdfRef[] = [];
     const visited = new Set<string>();
     const loadedPages = new Map<string, PdfDict>();
@@ -96,7 +96,7 @@ export class PageTree {
     await walk(pagesRef);
 
     // Load the root Pages dict
-    const root = (await getObject(pagesRef)) as PdfDict;
+    const root = await getObject(pagesRef);
 
     if (!(root instanceof PdfDict)) {
       throw new Error("Root Pages object is not a dictionary");
@@ -105,10 +105,11 @@ export class PageTree {
     // Create a sync getter for page dicts from our cache
     const getPageDict = (ref: PdfRef): PdfDict | null => {
       const key = `${ref.objectNumber} ${ref.generation}`;
+
       return loadedPages.get(key) ?? null;
     };
 
-    return new PageTree(pagesRef, root, pages, getPageDict);
+    return new PDFPageTree(pagesRef, root, pages, getPageDict);
   }
 
   /**
@@ -116,9 +117,10 @@ export class PageTree {
    * Note: This creates a minimal tree without a backing PDF structure.
    * Use only for documents without a page tree.
    */
-  static empty(): PageTree {
+  static empty(): PDFPageTree {
     // Create a minimal root dict
     const root = new PdfDict();
+
     root.set("Type", PdfDict.of({}).getName("Pages") ?? new PdfDict());
     root.set("Kids", new PdfArray());
     root.set("Count", PdfNumber.of(0));
@@ -126,7 +128,7 @@ export class PageTree {
     // Use a dummy ref since there's no backing object
     const dummyRef = PdfRef.of(0, 0);
 
-    return new PageTree(dummyRef, root, [], () => null);
+    return new PDFPageTree(dummyRef, root, [], () => null);
   }
 
   /**

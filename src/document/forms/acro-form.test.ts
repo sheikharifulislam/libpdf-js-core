@@ -9,7 +9,7 @@ import type {
   ListBoxField,
   RadioField,
   TextField,
-} from "./form-field";
+} from "./fields";
 import { ExistingFont } from "./form-font";
 
 describe("AcroForm", () => {
@@ -747,16 +747,15 @@ describe("Form Writing", () => {
       const form = (await pdf.getForm())?.acroForm();
 
       // Get first page content before flattening
-      const pageRef = pdf.getPage(0);
-      const pageDict = await pdf.getObject(pageRef!);
-      expect(pageDict).not.toBeNull();
+      const page = await pdf.getPage(0);
+      expect(page).not.toBeNull();
 
       // Flatten
       await form!.flatten();
 
       // After flattening, page should have additional content
       // (The flatten method appends a new content stream)
-      const pageAfter = await pdf.getObject(pageRef!);
+      const pageAfter = await pdf.getObject(page!.ref);
       expect(pageAfter).not.toBeNull();
     });
 
@@ -845,8 +844,8 @@ describe("Form Writing", () => {
       const pdf2 = await PDF.load(saved);
 
       // Get page resources to check XObjects
-      const pageRef = pdf2.getPage(0);
-      const pageDict = await pdf2.getObject(pageRef!);
+      const page = await pdf2.getPage(0);
+      const pageDict = page?.dict;
 
       if (pageDict && "getDict" in pageDict) {
         const resources = (pageDict as { getDict: (key: string) => unknown }).getDict("Resources");
@@ -883,8 +882,8 @@ describe("Form Writing", () => {
       const pdf2 = await PDF.load(saved);
 
       // Get first page content to verify wrapping worked
-      const pageRef = pdf2.getPage(0);
-      const pageDict = await pdf2.getObject(pageRef!);
+      const page = await pdf2.getPage(0);
+      const pageDict = page?.dict;
 
       // Verify page has Contents (the flattened content)
       expect(pageDict).toBeDefined();

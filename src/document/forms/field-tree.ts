@@ -9,13 +9,8 @@
 
 import { PdfDict } from "#src/objects/pdf-dict";
 import { PdfRef } from "#src/objects/pdf-ref";
-import {
-  createFormField,
-  type FormField,
-  NonTerminalField,
-  type TerminalField,
-} from "./form-field";
-import type { ObjectRegistry } from "./object-registry";
+import type { ObjectRegistry } from "../object-registry";
+import { createFormField, type FormField, NonTerminalField, type TerminalField } from "./fields";
 
 /**
  * Interface for AcroForm-like objects that can provide field tree iteration.

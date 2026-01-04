@@ -21,10 +21,10 @@
  * ```
  */
 
-import type { ObjectRegistry } from "#src/document/object-registry.ts";
 import { EmbeddedFont, type EmbedFontOptions } from "#src/fonts/embedded-font.ts";
 import { createFontObjects, registerFontObjects } from "#src/fonts/font-embedder.ts";
 import type { PdfRef } from "#src/objects/pdf-ref.ts";
+import type { PDFContext } from "./pdf-context.ts";
 
 /**
  * PDFFonts manages font embedding for a PDF document.
@@ -33,11 +33,11 @@ export class PDFFonts {
   /** Embedded fonts that need to be written on save */
   private readonly embeddedFonts: Map<EmbeddedFont, PdfRef | null> = new Map();
 
-  /** Registry for object management */
-  private readonly registry: ObjectRegistry;
+  /** PDF context */
+  private readonly ctx: PDFContext;
 
-  constructor(registry: ObjectRegistry) {
-    this.registry = registry;
+  constructor(ctx: PDFContext) {
+    this.ctx = ctx;
   }
 
   /**
@@ -154,7 +154,7 @@ export class PDFFonts {
       const result = await createFontObjects(font);
 
       // Register all objects and get the Type0 font reference
-      const fontRef = registerFontObjects(result, obj => this.registry.register(obj));
+      const fontRef = registerFontObjects(result, obj => this.ctx.register(obj));
 
       // Store the reference
       this.embeddedFonts.set(font, fontRef);

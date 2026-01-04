@@ -47,6 +47,7 @@ import { PdfDict } from "#src/objects/pdf-dict";
 import { PdfName } from "#src/objects/pdf-name";
 import type { PdfStream } from "#src/objects/pdf-stream";
 import { PdfString } from "#src/objects/pdf-string";
+import type { ObjectRegistry } from "../object-registry";
 import type { AcroForm } from "./acro-form";
 import type {
   ButtonField,
@@ -56,9 +57,8 @@ import type {
   RadioField,
   RgbColor,
   TextField,
-} from "./form-field";
+} from "./fields";
 import { ExistingFont, type FormFont, isEmbeddedFont, isExistingFont } from "./form-font";
-import type { ObjectRegistry } from "./object-registry";
 import type { WidgetAnnotation } from "./widget-annotation";
 
 /**

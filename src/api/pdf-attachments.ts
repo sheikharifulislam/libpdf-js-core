@@ -33,24 +33,19 @@ import {
 } from "#src/attachments/file-spec.ts";
 import type { AddAttachmentOptions, AttachmentInfo } from "#src/attachments/types.ts";
 import { buildNameTree } from "#src/document/name-tree.ts";
-import type { ObjectRegistry } from "#src/document/object-registry.ts";
-import type { PDFCatalog } from "#src/document/pdf-catalog.ts";
 import { PdfDict } from "#src/objects/pdf-dict.ts";
 import type { PdfRef } from "#src/objects/pdf-ref.ts";
+import type { PDFContext } from "./pdf-context.ts";
 
 /**
  * PDFAttachments manages file attachments for a PDF document.
  */
 export class PDFAttachments {
-  /** Registry for object management */
-  private readonly registry: ObjectRegistry;
+  /** PDF context */
+  private readonly ctx: PDFContext;
 
-  /** Document catalog */
-  private readonly catalog: PDFCatalog;
-
-  constructor(registry: ObjectRegistry, catalog: PDFCatalog) {
-    this.registry = registry;
-    this.catalog = catalog;
+  constructor(ctx: PDFContext) {
+    this.ctx = ctx;
   }
 
   /**
@@ -68,7 +63,7 @@ export class PDFAttachments {
    */
   async list(): Promise<Map<string, AttachmentInfo>> {
     const result = new Map<string, AttachmentInfo>();
-    const tree = await this.catalog.getEmbeddedFilesTree();
+    const tree = await this.ctx.catalog.getEmbeddedFilesTree();
 
     if (!tree) {
       return result;
@@ -79,13 +74,13 @@ export class PDFAttachments {
         continue;
       }
 
-      const info = await parseFileSpec(value, name, ref => this.registry.resolve(ref));
+      const info = await parseFileSpec(value, name, ref => this.ctx.registry.resolve(ref));
 
       if (info) {
         result.set(name, info);
       } else {
         // External file reference - skip but warn
-        this.registry.addWarning(
+        this.ctx.registry.addWarning(
           `Attachment "${name}" is an external file reference (not embedded)`,
         );
       }
@@ -110,7 +105,7 @@ export class PDFAttachments {
    * ```
    */
   async get(name: string): Promise<Uint8Array | null> {
-    const tree = await this.catalog.getEmbeddedFilesTree();
+    const tree = await this.ctx.catalog.getEmbeddedFilesTree();
 
     if (!tree) {
       return null;
@@ -122,7 +117,7 @@ export class PDFAttachments {
       return null;
     }
 
-    const stream = await getEmbeddedFileStream(fileSpec, ref => this.registry.resolve(ref));
+    const stream = await getEmbeddedFileStream(fileSpec, ref => this.ctx.registry.resolve(ref));
 
     if (!stream) {
       return null;
@@ -145,7 +140,7 @@ export class PDFAttachments {
    * ```
    */
   async has(name: string): Promise<boolean> {
-    const tree = await this.catalog.getEmbeddedFilesTree();
+    const tree = await this.ctx.catalog.getEmbeddedFilesTree();
 
     if (!tree) {
       return false;
@@ -185,15 +180,15 @@ export class PDFAttachments {
 
     // Create the embedded file stream
     const embeddedFileStream = createEmbeddedFileStream(data, name, options);
-    const embeddedFileRef = this.registry.register(embeddedFileStream);
+    const embeddedFileRef = this.ctx.registry.register(embeddedFileStream);
 
     // Create the file specification
     const fileSpec = createFileSpec(name, embeddedFileRef, options);
-    const fileSpecRef = this.registry.register(fileSpec);
+    const fileSpecRef = this.ctx.registry.register(fileSpec);
 
     // Collect all existing attachments
     const existingAttachments: Array<[string, PdfRef]> = [];
-    const tree = await this.catalog.getEmbeddedFilesTree();
+    const tree = await this.ctx.catalog.getEmbeddedFilesTree();
 
     if (tree) {
       for await (const [key, value] of tree.entries()) {
@@ -203,7 +198,7 @@ export class PDFAttachments {
         }
 
         // Get the ref for this file spec
-        const ref = this.registry.getRef(value);
+        const ref = this.ctx.registry.getRef(value);
 
         if (ref) {
           existingAttachments.push([key, ref]);
@@ -216,7 +211,7 @@ export class PDFAttachments {
 
     // Build new name tree and set it
     const newNameTree = buildNameTree(existingAttachments);
-    await this.catalog.setEmbeddedFilesTree(newNameTree);
+    await this.ctx.catalog.setEmbeddedFilesTree(newNameTree);
   }
 
   /**
@@ -234,7 +229,7 @@ export class PDFAttachments {
    * ```
    */
   async remove(name: string): Promise<boolean> {
-    const tree = await this.catalog.getEmbeddedFilesTree();
+    const tree = await this.ctx.catalog.getEmbeddedFilesTree();
 
     if (!tree) {
       return false;
@@ -253,7 +248,7 @@ export class PDFAttachments {
         continue; // Skip the one we're removing
       }
 
-      const ref = this.registry.getRef(value);
+      const ref = this.ctx.registry.getRef(value);
 
       if (ref) {
         remainingAttachments.push([key, ref]);
@@ -262,11 +257,11 @@ export class PDFAttachments {
 
     if (remainingAttachments.length === 0) {
       // No attachments left - remove /EmbeddedFiles entry
-      await this.catalog.removeEmbeddedFilesTree();
+      await this.ctx.catalog.removeEmbeddedFilesTree();
     } else {
       // Build new tree with remaining attachments
       const newNameTree = buildNameTree(remainingAttachments);
-      await this.catalog.setEmbeddedFilesTree(newNameTree);
+      await this.ctx.catalog.setEmbeddedFilesTree(newNameTree);
     }
 
     return true;

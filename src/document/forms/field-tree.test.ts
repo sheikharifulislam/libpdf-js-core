@@ -5,7 +5,7 @@
 import { describe, expect, it } from "vitest";
 import { PDF } from "#src/api/pdf";
 import { loadFixture } from "#src/test-utils";
-import { NonTerminalField } from "./form-field";
+import { NonTerminalField } from "./fields";
 
 describe("FieldTree", () => {
   describe("getFieldTree", () => {

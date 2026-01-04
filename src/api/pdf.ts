@@ -8,17 +8,12 @@
 import type { AddAttachmentOptions, AttachmentInfo } from "#src/attachments/types";
 
 import { hasChanges } from "#src/document/change-collector";
-import {
-  checkIncrementalSaveBlocker,
-  type IncrementalSaveBlocker,
-  isLinearizationDict,
-} from "#src/document/linearization";
+import { isLinearizationDict } from "#src/document/linearization";
 import { ObjectCopier } from "#src/document/object-copier";
 import { ObjectRegistry } from "#src/document/object-registry";
-import { PageTree } from "#src/document/page-tree";
-import { PDFCatalog } from "#src/document/pdf-catalog";
 import type { EmbeddedFont, EmbedFontOptions } from "#src/fonts/embedded-font";
 import { resolvePageSize } from "#src/helpers/page-size";
+import { checkIncrementalSaveBlocker, type IncrementalSaveBlocker } from "#src/helpers/save-utils";
 import { Scanner } from "#src/io/scanner";
 import { PdfArray } from "#src/objects/pdf-array";
 import { PdfDict } from "#src/objects/pdf-dict";
@@ -27,16 +22,16 @@ import { PdfNumber } from "#src/objects/pdf-number";
 import type { PdfObject } from "#src/objects/pdf-object";
 import { PdfRef } from "#src/objects/pdf-ref";
 import { PdfStream } from "#src/objects/pdf-stream";
-import {
-  DocumentParser,
-  type ParsedDocument,
-  type ParseOptions,
-} from "#src/parser/document-parser";
+import { DocumentParser, type ParseOptions } from "#src/parser/document-parser";
 import { XRefParser } from "#src/parser/xref-parser";
 import { writeComplete, writeIncremental } from "#src/writer/pdf-writer";
 import { PDFAttachments } from "./pdf-attachments";
+import { PDFCatalog } from "./pdf-catalog";
+import { PDFContext } from "./pdf-context";
 import { PDFFonts } from "./pdf-fonts";
 import { PDFForm } from "./pdf-form";
+import { PDFPage } from "./pdf-page";
+import { PDFPageTree } from "./pdf-page-tree";
 
 /**
  * Options for loading a PDF.
@@ -110,16 +105,11 @@ export interface CopyPagesOptions {
  * ```
  */
 export class PDF {
-  private readonly parsed: ParsedDocument;
-  private readonly registry: ObjectRegistry;
+  /** Central context for document operations */
+  private readonly ctx: PDFContext;
+
   private readonly originalBytes: Uint8Array;
   private readonly originalXRefOffset: number;
-
-  /** Page tree, loaded eagerly during PDF.load() */
-  private readonly _pages: PageTree;
-
-  /** Document catalog wrapper */
-  private readonly _catalog: PDFCatalog;
 
   /** Font operations manager (created lazily) */
   private _fonts: PDFFonts | null = null;
@@ -141,34 +131,25 @@ export class PDF {
 
   /** Warnings from parsing and operations */
   get warnings(): string[] {
-    return this.registry.warnings;
+    return this.ctx.warnings;
   }
 
   private constructor(
-    parsed: ParsedDocument,
-    registry: ObjectRegistry,
+    ctx: PDFContext,
     originalBytes: Uint8Array,
     originalXRefOffset: number,
-    pages: PageTree,
-    catalog: PDFCatalog,
     options: {
       recoveredViaBruteForce: boolean;
       isLinearized: boolean;
       usesXRefStreams: boolean;
     },
   ) {
-    this.parsed = parsed;
-    this.registry = registry;
+    this.ctx = ctx;
     this.originalBytes = originalBytes;
     this.originalXRefOffset = originalXRefOffset;
-    this._pages = pages;
-    this._catalog = catalog;
     this.recoveredViaBruteForce = options.recoveredViaBruteForce;
     this.isLinearized = options.isLinearized;
     this.usesXRefStreams = options.usesXRefStreams;
-
-    // Set up resolver so registry can fetch objects on demand
-    this.registry.setResolver(ref => this.parsed.getObject(ref));
   }
 
   // ─────────────────────────────────────────────────────────────────────────────
@@ -237,10 +218,12 @@ export class PDF {
     const pdfCatalog = new PDFCatalog(catalogDict, registry);
     const pagesRef = catalogDict.getRef("Pages");
     const pages = pagesRef
-      ? await PageTree.load(pagesRef, parsed.getObject.bind(parsed))
-      : PageTree.empty();
+      ? await PDFPageTree.load(pagesRef, parsed.getObject.bind(parsed))
+      : PDFPageTree.empty();
 
-    return new PDF(parsed, registry, bytes, originalXRefOffset, pages, pdfCatalog, {
+    const ctx = new PDFContext(registry, pdfCatalog, pages, parsed);
+
+    return new PDF(ctx, bytes, originalXRefOffset, {
       recoveredViaBruteForce: parsed.recoveredViaBruteForce,
       isLinearized,
       usesXRefStreams,
@@ -253,17 +236,17 @@ export class PDF {
 
   /** PDF version string (e.g., "1.7", "2.0") */
   get version(): string {
-    return this.parsed.version;
+    return this.ctx.parsed.version;
   }
 
   /** Whether the document is encrypted */
   get isEncrypted(): boolean {
-    return this.parsed.isEncrypted;
+    return this.ctx.parsed.isEncrypted;
   }
 
   /** Whether authentication succeeded (for encrypted docs) */
   get isAuthenticated(): boolean {
-    return this.parsed.isAuthenticated;
+    return this.ctx.parsed.isAuthenticated;
   }
 
   // ─────────────────────────────────────────────────────────────────────────────
@@ -276,39 +259,65 @@ export class PDF {
    * Objects are cached and tracked for modifications.
    */
   async getObject(ref: PdfRef): Promise<PdfObject | null> {
-    return this.registry.resolve(ref);
+    return this.ctx.resolve(ref);
   }
 
   /**
    * Get the document catalog dictionary.
    *
-   * Note: For internal use, prefer accessing `this._catalog` which provides
-   * higher-level methods for working with catalog structures.
+   * Note: For internal use, prefer accessing the catalog via context which
+   * provides higher-level methods for working with catalog structures.
    */
   async getCatalog(): Promise<PdfDict | null> {
-    return this._catalog.getDict();
+    return this.ctx.catalog.getDict();
   }
 
   /**
-   * Get all page references in document order.
+   * Get all pages in document order.
    */
-  getPages(): PdfRef[] {
-    return this._pages.getPages();
+  async getPages(): Promise<PDFPage[]> {
+    const refs = this.ctx.pages.getPages();
+    const pages: PDFPage[] = [];
+
+    for (let i = 0; i < refs.length; i++) {
+      const ref = refs[i];
+      const dict = await this.ctx.resolve(ref);
+
+      if (!(dict instanceof PdfDict)) {
+        throw new Error(`Page ${i} is not a dictionary`);
+      }
+
+      pages.push(new PDFPage(ref, dict, i));
+    }
+
+    return pages;
   }
 
   /**
    * Get page count.
    */
   getPageCount(): number {
-    return this._pages.getPageCount();
+    return this.ctx.pages.getPageCount();
   }
 
   /**
    * Get a single page by index (0-based).
    * Returns null if index out of bounds.
    */
-  getPage(index: number): PdfRef | null {
-    return this._pages.getPage(index);
+  async getPage(index: number): Promise<PDFPage | null> {
+    const ref = this.ctx.pages.getPage(index);
+
+    if (!ref) {
+      return null;
+    }
+
+    const dict = await this.ctx.resolve(ref);
+
+    if (!(dict instanceof PdfDict)) {
+      return null;
+    }
+
+    return new PDFPage(ref, dict, index);
   }
 
   // ─────────────────────────────────────────────────────────────────────────────
@@ -319,14 +328,14 @@ export class PDF {
    * Add a new blank page.
    *
    * @param options Page size, rotation, and insertion position
-   * @returns The reference to the new page
+   * @returns The new page
    */
-  addPage(options: AddPageOptions = {}): PdfRef {
+  addPage(options: AddPageOptions = {}): PDFPage {
     const { width, height } = resolvePageSize(options);
     const rotate = options.rotate ?? 0;
 
     // Create minimal page dict
-    const page = PdfDict.of({
+    const pageDict = PdfDict.of({
       Type: PdfName.Page,
       MediaBox: new PdfArray([
         PdfNumber.of(0),
@@ -338,17 +347,17 @@ export class PDF {
     });
 
     if (rotate !== 0) {
-      page.set("Rotate", PdfNumber.of(rotate));
+      pageDict.set("Rotate", PdfNumber.of(rotate));
     }
 
     // Register the page
-    const pageRef = this.register(page);
+    const pageRef = this.register(pageDict);
 
     // Insert at specified position or append
     const index = options.insertAt ?? this.getPageCount();
-    this._pages.insertPage(index, pageRef, page);
+    this.ctx.pages.insertPage(index, pageRef, pageDict);
 
-    return pageRef;
+    return new PDFPage(pageRef, pageDict, index);
   }
 
   /**
@@ -365,7 +374,7 @@ export class PDF {
     if (page instanceof PdfRef) {
       pageRef = page;
       // Get the dict from registry or throw
-      const obj = this.registry.getObject(page);
+      const obj = this.ctx.registry.getObject(page);
 
       if (!(obj instanceof PdfDict)) {
         throw new Error("Page reference does not point to a dictionary");
@@ -378,7 +387,7 @@ export class PDF {
       pageDict = page;
     }
 
-    this._pages.insertPage(index, pageRef, pageDict);
+    this.ctx.pages.insertPage(index, pageRef, pageDict);
 
     return pageRef;
   }
@@ -391,7 +400,7 @@ export class PDF {
    * @throws RangeError if index is out of bounds
    */
   removePage(index: number): PdfRef {
-    return this._pages.removePage(index);
+    return this.ctx.pages.removePage(index);
   }
 
   /**
@@ -402,7 +411,7 @@ export class PDF {
    * @throws RangeError if either index is out of bounds
    */
   movePage(fromIndex: number, toIndex: number): void {
-    this._pages.movePage(fromIndex, toIndex);
+    this.ctx.pages.movePage(fromIndex, toIndex);
   }
 
   /**
@@ -455,13 +464,13 @@ export class PDF {
 
     // Copy each page
     for (const index of indices) {
-      const srcPageRef = source.getPage(index);
+      const srcPage = await source.getPage(index);
 
-      if (!srcPageRef) {
+      if (!srcPage) {
         throw new Error(`Source page ${index} not found`);
       }
 
-      const copiedPageRef = await copier.copyPage(srcPageRef);
+      const copiedPageRef = await copier.copyPage(srcPage.ref);
       copiedRefs.push(copiedPageRef);
     }
 
@@ -475,7 +484,7 @@ export class PDF {
         throw new Error("Copied page is not a dictionary");
       }
 
-      this._pages.insertPage(insertIndex, copiedRef, copiedPage);
+      this.ctx.pages.insertPage(insertIndex, copiedRef, copiedPage);
       insertIndex++;
     }
 
@@ -492,7 +501,7 @@ export class PDF {
    * The object will be written on the next save.
    */
   register(obj: PdfObject): PdfRef {
-    return this.registry.register(obj);
+    return this.ctx.registry.register(obj);
   }
 
   /**
@@ -562,7 +571,7 @@ export class PDF {
    */
   get fonts(): PDFFonts {
     if (!this._fonts) {
-      this._fonts = new PDFFonts(this.registry);
+      this._fonts = new PDFFonts(this.ctx);
     }
 
     return this._fonts;
@@ -619,7 +628,7 @@ export class PDF {
    */
   get attachments(): PDFAttachments {
     if (!this._attachments) {
-      this._attachments = new PDFAttachments(this.registry, this._catalog);
+      this._attachments = new PDFAttachments(this.ctx);
     }
 
     return this._attachments;
@@ -724,7 +733,7 @@ export class PDF {
    */
   async getForm(): Promise<PDFForm | null> {
     if (this._form === undefined) {
-      this._form = await PDFForm.load(this.registry, this._catalog, this._pages);
+      this._form = await PDFForm.load(this.ctx);
     }
 
     return this._form;
@@ -738,7 +747,7 @@ export class PDF {
    * Check if the document has unsaved changes.
    */
   hasChanges(): boolean {
-    return hasChanges(this.registry);
+    return hasChanges(this.ctx.registry);
   }
 
   /**
@@ -776,7 +785,9 @@ export class PDF {
     // Check if incremental is requested but not possible
 
     if (wantsIncremental && blocker !== null) {
-      this.registry.addWarning(`Incremental save not possible (${blocker}), performing full save`);
+      this.ctx.registry.addWarning(
+        `Incremental save not possible (${blocker}), performing full save`,
+      );
     }
 
     const useIncremental = wantsIncremental && blocker === null;
@@ -788,14 +799,14 @@ export class PDF {
     }
 
     // Get root reference from trailer
-    const root = this.parsed.trailer.getRef("Root");
+    const root = this.ctx.parsed.trailer.getRef("Root");
 
     if (!root) {
       throw new Error("Document has no catalog (missing /Root in trailer)");
     }
 
     // Get optional info reference
-    const info = this.parsed.trailer.getRef("Info");
+    const info = this.ctx.parsed.trailer.getRef("Info");
 
     // TODO: Handle encryption, ID arrays properly
     // For incremental saves, use the same XRef format as the original document
@@ -803,7 +814,7 @@ export class PDF {
     const useXRefStream = options.useXRefStream ?? (useIncremental ? this.usesXRefStreams : false);
 
     if (useIncremental) {
-      const result = await writeIncremental(this.registry, {
+      const result = await writeIncremental(this.ctx.registry, {
         originalBytes: this.originalBytes,
         originalXRefOffset: this.originalXRefOffset,
         root,
@@ -819,8 +830,8 @@ export class PDF {
     await this.ensureObjectsLoaded();
 
     // Full save
-    const result = await writeComplete(this.registry, {
-      version: this.parsed.version,
+    const result = await writeComplete(this.ctx.registry, {
+      version: this.ctx.parsed.version,
       root,
       info: info ?? undefined,
       useXRefStream,
@@ -866,14 +877,14 @@ export class PDF {
     };
 
     // Start from root
-    const root = this.parsed.trailer.getRef("Root");
+    const root = this.ctx.parsed.trailer.getRef("Root");
 
     if (root) {
       await walk(root);
     }
 
     // Also load Info if present
-    const info = this.parsed.trailer.getRef("Info");
+    const info = this.ctx.parsed.trailer.getRef("Info");
 
     if (info) {
       await walk(info);

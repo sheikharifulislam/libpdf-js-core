@@ -37,7 +37,7 @@
  * ```
  */
 
-import { AcroForm, type FlattenOptions } from "#src/document/acro-form";
+import { AcroForm } from "#src/document/forms/acro-form";
 import {
   type ButtonField,
   type CheckboxField,
@@ -48,10 +48,9 @@ import {
   type SignatureField,
   TerminalField,
   type TextField,
-} from "#src/document/form-field";
-import type { ObjectRegistry } from "#src/document/object-registry";
-import type { PageTree } from "#src/document/page-tree";
-import type { PDFCatalog } from "#src/document/pdf-catalog";
+} from "#src/document/forms/fields";
+import type { FlattenOptions } from "#src/document/forms/form-flattener";
+import type { PDFContext } from "./pdf-context";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Constants
@@ -104,13 +103,13 @@ export interface FormProperties {
  */
 export class PDFForm {
   private readonly _acroForm: AcroForm;
-  private readonly _catalog: PDFCatalog;
+  private readonly _ctx: PDFContext;
   private fieldsByName: Map<string, FormField>;
   private allFields: FormField[];
 
-  private constructor(acroForm: AcroForm, catalog: PDFCatalog, fields: FormField[]) {
+  private constructor(acroForm: AcroForm, ctx: PDFContext, fields: FormField[]) {
     this._acroForm = acroForm;
-    this._catalog = catalog;
+    this._ctx = ctx;
     this.allFields = fields;
     this.fieldsByName = new Map(fields.map(f => [f.name, f]));
   }
@@ -118,22 +117,16 @@ export class PDFForm {
   /**
    * Load and create a PDFForm instance.
    *
-   * @internal Called by `PDF.load()`.
-   * @param registry The object registry
-   * @param catalog The PDF catalog
-   * @param pageTree The page tree for efficient page lookups during flattening
+   * @internal Called by `PDF.getForm()`.
+   * @param ctx The PDF context
    * @returns PDFForm instance, or null if no form exists
    */
-  static async load(
-    registry: ObjectRegistry,
-    catalog: PDFCatalog,
-    pageTree: PageTree,
-  ): Promise<PDFForm | null> {
-    const acroForm = await AcroForm.load(catalog.getDict(), registry, pageTree);
+  static async load(ctx: PDFContext): Promise<PDFForm | null> {
+    const acroForm = await AcroForm.load(ctx.catalog.getDict(), ctx.registry, ctx.pages);
     if (!acroForm) return null;
 
     const fields = await acroForm.getFields();
-    return new PDFForm(acroForm, catalog, fields);
+    return new PDFForm(acroForm, ctx, fields);
   }
 
   // ─────────────────────────────────────────────────────────────────────────────
@@ -428,7 +421,7 @@ export class PDFForm {
     await this._acroForm.flatten(options);
 
     // Remove AcroForm from catalog to fully eliminate form interactivity
-    this._catalog.removeAcroForm();
+    this._ctx.catalog.removeAcroForm();
 
     // Clear cached fields since form is now empty
     this.allFields = [];

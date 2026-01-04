@@ -8,10 +8,10 @@
  * PDF Reference: Section 7.7.2 "Document Catalog"
  */
 
+import { NameTree } from "#src/document/name-tree";
+import type { ObjectRegistry } from "#src/document/object-registry";
 import { PdfDict } from "#src/objects/pdf-dict";
 import { PdfRef } from "#src/objects/pdf-ref";
-import { NameTree } from "./name-tree";
-import type { ObjectRegistry } from "./object-registry";
 
 /**
  * PDFCatalog provides access to the document catalog and its sub-structures.

@@ -17,7 +17,7 @@ export {
   PDFForm,
   TextAlignment,
 } from "./api/pdf-form";
-export type { FlattenOptions } from "./document/acro-form";
+export { PDFPage } from "./api/pdf-page";
 export type {
   ButtonField,
   CheckboxField,
@@ -28,7 +28,8 @@ export type {
   RadioField,
   SignatureField,
   TextField,
-} from "./document/form-field";
+} from "./document/forms/fields";
+export type { FlattenOptions } from "./document/forms/form-flattener";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // PDF Objects

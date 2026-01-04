@@ -19,7 +19,7 @@ import {
 import { unicodeToGlyphName } from "#src/helpers/unicode";
 import type { PdfDict } from "#src/objects/pdf-dict";
 import type { PdfRef } from "#src/objects/pdf-ref";
-import type { ObjectRegistry } from "./object-registry";
+import type { ObjectRegistry } from "../object-registry";
 
 /**
  * Union type for fonts usable in form fields.
