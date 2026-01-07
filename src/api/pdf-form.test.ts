@@ -350,3 +350,333 @@ describe("TextAlignment", () => {
     expect(TextAlignment.Right).toBe(2);
   });
 });
+
+describe("Field Creation", () => {
+  describe("createTextField", () => {
+    it("creates a text field with default options", async () => {
+      const pdf = PDF.create();
+      const form = await pdf.getOrCreateForm();
+
+      const field = form.createTextField("name");
+
+      expect(field).toBeDefined();
+      expect(field.name).toBe("name");
+      expect(field.type).toBe("text");
+      expect(field.getValue()).toBe("");
+    });
+
+    it("creates a text field with options", async () => {
+      const pdf = PDF.create();
+      const form = await pdf.getOrCreateForm();
+
+      const field = form.createTextField("name", {
+        maxLength: 50,
+        multiline: false,
+        alignment: TextAlignment.Center,
+        defaultValue: "John Doe",
+      });
+
+      expect(field.getValue()).toBe("John Doe");
+      expect(field.maxLength).toBe(50);
+      expect(field.alignment).toBe(TextAlignment.Center);
+    });
+
+    it("throws on duplicate field name", async () => {
+      const pdf = PDF.create();
+      const form = await pdf.getOrCreateForm();
+
+      form.createTextField("name");
+
+      expect(() => form.createTextField("name")).toThrow('Field "name" already exists');
+    });
+
+    it("adds field to form's field list", async () => {
+      const pdf = PDF.create();
+      const form = await pdf.getOrCreateForm();
+
+      const field = form.createTextField("name");
+
+      expect(form.getFields()).toContain(field);
+      expect(form.getField("name")).toBe(field);
+    });
+  });
+
+  describe("createCheckbox", () => {
+    it("creates a checkbox with default options", async () => {
+      const pdf = PDF.create();
+      const form = await pdf.getOrCreateForm();
+
+      const field = form.createCheckbox("agree");
+
+      expect(field).toBeDefined();
+      expect(field.name).toBe("agree");
+      expect(field.type).toBe("checkbox");
+      expect(field.isChecked()).toBe(false);
+    });
+
+    it("creates a checked checkbox", async () => {
+      const pdf = PDF.create();
+      const form = await pdf.getOrCreateForm();
+
+      const field = form.createCheckbox("agree", {
+        defaultChecked: true,
+        onValue: "Agreed",
+      });
+
+      expect(field.isChecked()).toBe(true);
+      expect(field.getValue()).toBe("Agreed");
+    });
+  });
+
+  describe("createRadioGroup", () => {
+    it("creates a radio group with options", async () => {
+      const pdf = PDF.create();
+      const form = await pdf.getOrCreateForm();
+
+      const field = form.createRadioGroup("payment", {
+        options: ["Credit", "PayPal", "Bank"],
+        defaultValue: "Credit",
+      });
+
+      expect(field).toBeDefined();
+      expect(field.name).toBe("payment");
+      expect(field.type).toBe("radio");
+      expect(field.getValue()).toBe("Credit");
+    });
+
+    it("throws without options", async () => {
+      const pdf = PDF.create();
+      const form = await pdf.getOrCreateForm();
+
+      expect(() =>
+        form.createRadioGroup("payment", {
+          options: [],
+        }),
+      ).toThrow("Radio group must have at least one option");
+    });
+  });
+
+  describe("createDropdown", () => {
+    it("creates a dropdown with options", async () => {
+      const pdf = PDF.create();
+      const form = await pdf.getOrCreateForm();
+
+      const field = form.createDropdown("country", {
+        options: ["USA", "Canada", "UK"],
+        defaultValue: "USA",
+      });
+
+      expect(field).toBeDefined();
+      expect(field.name).toBe("country");
+      expect(field.type).toBe("dropdown");
+      expect(field.getValue()).toBe("USA");
+    });
+
+    it("creates an editable dropdown", async () => {
+      const pdf = PDF.create();
+      const form = await pdf.getOrCreateForm();
+
+      const field = form.createDropdown("city", {
+        options: ["New York", "Los Angeles"],
+        editable: true,
+      });
+
+      expect(field.isEditable).toBe(true);
+    });
+  });
+
+  describe("createListbox", () => {
+    it("creates a listbox with options", async () => {
+      const pdf = PDF.create();
+      const form = await pdf.getOrCreateForm();
+
+      const field = form.createListbox("colors", {
+        options: ["Red", "Green", "Blue"],
+      });
+
+      expect(field).toBeDefined();
+      expect(field.name).toBe("colors");
+      expect(field.type).toBe("listbox");
+    });
+
+    it("creates a multi-select listbox with defaults", async () => {
+      const pdf = PDF.create();
+      const form = await pdf.getOrCreateForm();
+
+      const field = form.createListbox("colors", {
+        options: ["Red", "Green", "Blue"],
+        multiSelect: true,
+        defaultValue: ["Red", "Blue"],
+      });
+
+      expect(field.isMultiSelect).toBe(true);
+      const values = field.getValue();
+      expect(values).toContain("Red");
+      expect(values).toContain("Blue");
+    });
+  });
+
+  describe("getOrCreateForm", () => {
+    it("creates form with proper structure for PDF without form", async () => {
+      const pdf = PDF.create();
+
+      const form = await pdf.getOrCreateForm();
+
+      expect(form).toBeDefined();
+      expect(form.fieldCount).toBe(0);
+
+      // Verify default appearance is set
+      const props = form.properties;
+      expect(props.defaultAppearance).toContain("Helv");
+    });
+
+    it("returns existing form if present", async () => {
+      const bytes = await loadFixture("forms", "sample_form.pdf");
+      const pdf = await PDF.load(bytes);
+
+      const form1 = await pdf.getOrCreateForm();
+      const form2 = await pdf.getOrCreateForm();
+
+      expect(form1).toBe(form2);
+    });
+  });
+});
+
+describe("drawField", () => {
+  it("places a text field on a page", async () => {
+    const pdf = PDF.create();
+    pdf.addPage({ size: "letter" });
+    const form = await pdf.getOrCreateForm();
+    const page = await pdf.getPage(0);
+
+    const field = form.createTextField("name", {
+      defaultValue: "John",
+    });
+
+    await page!.drawField(field, {
+      x: 100,
+      y: 700,
+      width: 200,
+      height: 24,
+    });
+
+    // Field should now have one widget
+    const widgets = field.getWidgets();
+    expect(widgets).toHaveLength(1);
+    expect(widgets[0].width).toBe(200);
+    expect(widgets[0].height).toBe(24);
+  });
+
+  it("places multiple widgets for same field", async () => {
+    const pdf = PDF.create();
+    pdf.addPage({ size: "letter" });
+    pdf.addPage({ size: "letter" });
+    const form = await pdf.getOrCreateForm();
+    const page1 = await pdf.getPage(0);
+    const page2 = await pdf.getPage(1);
+
+    const field = form.createTextField("name");
+
+    await page1!.drawField(field, { x: 100, y: 700, width: 200, height: 24 });
+    await page2!.drawField(field, { x: 50, y: 500, width: 300, height: 30 });
+
+    const widgets = field.getWidgets();
+    expect(widgets).toHaveLength(2);
+  });
+
+  it("requires option for radio groups", async () => {
+    const pdf = PDF.create();
+    pdf.addPage({ size: "letter" });
+    const form = await pdf.getOrCreateForm();
+    const page = await pdf.getPage(0);
+
+    const radioField = form.createRadioGroup("payment", {
+      options: ["Credit", "PayPal"],
+    });
+
+    await expect(
+      page!.drawField(radioField, { x: 100, y: 700, width: 16, height: 16 }),
+    ).rejects.toThrow("requires option parameter");
+  });
+
+  it("places radio widgets with option", async () => {
+    const pdf = PDF.create();
+    pdf.addPage({ size: "letter" });
+    const form = await pdf.getOrCreateForm();
+    const page = await pdf.getPage(0);
+
+    const radioField = form.createRadioGroup("payment", {
+      options: ["Credit", "PayPal"],
+    });
+
+    await page!.drawField(radioField, {
+      x: 100,
+      y: 700,
+      width: 16,
+      height: 16,
+      option: "Credit",
+    });
+    await page!.drawField(radioField, {
+      x: 100,
+      y: 670,
+      width: 16,
+      height: 16,
+      option: "PayPal",
+    });
+
+    const widgets = radioField.getWidgets();
+    expect(widgets).toHaveLength(2);
+  });
+
+  it("validates radio option value", async () => {
+    const pdf = PDF.create();
+    pdf.addPage({ size: "letter" });
+    const form = await pdf.getOrCreateForm();
+    const page = await pdf.getPage(0);
+
+    const radioField = form.createRadioGroup("payment", {
+      options: ["Credit", "PayPal"],
+    });
+
+    await expect(
+      page!.drawField(radioField, {
+        x: 100,
+        y: 700,
+        width: 16,
+        height: 16,
+        option: "InvalidOption",
+      }),
+    ).rejects.toThrow("Invalid option");
+  });
+
+  it("saves PDF with created fields", async () => {
+    const pdf = PDF.create();
+    pdf.addPage({ size: "letter" });
+    const form = await pdf.getOrCreateForm();
+    const page = await pdf.getPage(0);
+
+    const nameField = form.createTextField("name", {
+      defaultValue: "Test User",
+    });
+    await page!.drawField(nameField, { x: 100, y: 700, width: 200, height: 24 });
+
+    const checkbox = form.createCheckbox("agree", { defaultChecked: true });
+    await page!.drawField(checkbox, { x: 100, y: 650, width: 18, height: 18 });
+
+    // Save and reload
+    const bytes = await pdf.save();
+    const pdf2 = await PDF.load(bytes);
+    const form2 = await pdf2.getForm();
+
+    expect(form2).not.toBeNull();
+    expect(form2!.fieldCount).toBe(2);
+
+    const nameField2 = form2!.getTextField("name");
+    expect(nameField2).toBeDefined();
+    expect(nameField2!.getValue()).toBe("Test User");
+
+    const checkbox2 = form2!.getCheckbox("agree");
+    expect(checkbox2).toBeDefined();
+    expect(checkbox2!.isChecked()).toBe(true);
+  });
+});

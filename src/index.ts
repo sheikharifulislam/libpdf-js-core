@@ -20,12 +20,31 @@ export {
 } from "./api/pdf";
 export { PDFEmbeddedPage } from "./api/pdf-embedded-page";
 export {
+  type CheckboxOptions,
+  type CheckboxSymbol,
+  type DropdownOptions,
+  type FieldOptions,
   type FieldValue,
   type FormProperties,
+  type ListboxOptions,
   PDFForm,
+  type RadioGroupOptions,
+  type RadioSymbol,
+  type SignatureFieldOptions,
   TextAlignment,
+  type TextFieldOptions,
 } from "./api/pdf-form";
-export { type DrawPageOptions, PDFPage, type Rectangle } from "./api/pdf-page";
+export {
+  type DrawFieldOptions,
+  type DrawPageOptions,
+  PDFPage,
+  type Rectangle,
+} from "./api/pdf-page";
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Color and Rotation Helpers
+// ─────────────────────────────────────────────────────────────────────────────
+
 export type {
   ButtonField,
   CheckboxField,
@@ -38,6 +57,16 @@ export type {
   TextField,
 } from "./document/forms/fields";
 export type { FlattenOptions } from "./document/forms/form-flattener";
+export {
+  type CMYK,
+  type Color,
+  cmyk,
+  type Grayscale,
+  grayscale,
+  type RGB,
+  rgb,
+} from "./helpers/colors";
+export { type Degrees, degrees } from "./helpers/rotations";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Layers (Optional Content Groups)

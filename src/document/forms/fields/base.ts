@@ -9,6 +9,7 @@
  * PDF Reference: Section 12.7 "Interactive Forms"
  */
 
+import { PdfArray } from "#src/objects/pdf-array";
 import { PdfDict } from "#src/objects/pdf-dict";
 import { PdfName } from "#src/objects/pdf-name";
 import type { PdfObject } from "#src/objects/pdf-object";
@@ -481,6 +482,42 @@ export abstract class TerminalField extends FormField {
     if (mkEntry instanceof PdfRef) {
       await this.registry.resolve(mkEntry);
     }
+  }
+
+  /**
+   * Add a widget to this field's /Kids array.
+   *
+   * This is used when creating new fields that use the separate widget model.
+   * The widget dict is registered and its ref is added to /Kids.
+   *
+   * @param widgetDict The widget annotation dictionary
+   * @returns The WidgetAnnotation wrapper for the new widget
+   */
+  addWidget(widgetDict: PdfDict): WidgetAnnotation {
+    // Register the widget dict
+    const widgetRef = this.registry.register(widgetDict);
+
+    // Ensure /Kids array exists
+    let kids = this.dict.getArray("Kids");
+
+    if (!kids) {
+      kids = new PdfArray([]);
+      this.dict.set("Kids", kids);
+    }
+
+    // Add widget ref to /Kids
+    kids.push(widgetRef);
+
+    // Create widget annotation and add to cache
+    const widget = new WidgetAnnotation(widgetDict, widgetRef, this.registry);
+
+    if (this._widgets === null) {
+      this._widgets = [];
+    }
+
+    this._widgets.push(widget);
+
+    return widget;
   }
 
   // ─────────────────────────────────────────────────────────────────────────────

@@ -43,6 +43,7 @@ import {
   type CheckboxField,
   createFormField,
   type DropdownField,
+  FieldFlags,
   type FormField,
   type ListBoxField,
   type RadioField,
@@ -51,11 +52,13 @@ import {
   type TextField,
 } from "#src/document/forms/fields";
 import type { FlattenOptions } from "#src/document/forms/form-flattener";
+import type { EmbeddedFont } from "#src/fonts/embedded-font";
+import { type Color, colorToArray } from "#src/helpers/colors";
+import type { Degrees } from "#src/helpers/rotations";
 import { PdfArray } from "#src/objects/pdf-array";
 import { PdfDict } from "#src/objects/pdf-dict";
 import { PdfName } from "#src/objects/pdf-name";
 import { PdfNumber } from "#src/objects/pdf-number";
-import type { PdfRef } from "#src/objects/pdf-ref";
 import { PdfString } from "#src/objects/pdf-string";
 import type { PDFContext } from "./pdf-context";
 
@@ -97,6 +100,123 @@ export interface FormProperties {
   hasSignatures: boolean;
   /** Whether the document is append-only (signed) */
   isAppendOnly: boolean;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Field Creation Options
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Checkbox/radio symbol types.
+ */
+export type CheckboxSymbol = "check" | "cross" | "square";
+export type RadioSymbol = "circle" | "check";
+
+/**
+ * Common options for all field types.
+ */
+export interface FieldOptions {
+  /** Background color */
+  backgroundColor?: Color;
+  /** Border color */
+  borderColor?: Color;
+  /** Border width in points (default: 1) */
+  borderWidth?: number;
+  /** Rotation angle (0, 90, 180, 270) */
+  rotate?: Degrees;
+}
+
+/**
+ * Options for creating a text field.
+ */
+export interface TextFieldOptions extends FieldOptions {
+  /** Font for text rendering */
+  font?: EmbeddedFont;
+  /** Font size in points (0 = auto-size) */
+  fontSize?: number;
+  /** Text color (default: black) */
+  color?: Color;
+  /** Maximum character length (0 = no limit) */
+  maxLength?: number;
+  /** Whether this is a multiline field */
+  multiline?: boolean;
+  /** Whether to mask input (password field) */
+  password?: boolean;
+  /** Whether to use comb layout (fixed-width character cells) */
+  comb?: boolean;
+  /** Text alignment (default: Left) */
+  alignment?: TextAlignment;
+  /** Default value */
+  defaultValue?: string;
+}
+
+/**
+ * Options for creating a checkbox.
+ */
+export interface CheckboxOptions extends FieldOptions {
+  /** Value when checked (default: "Yes") */
+  onValue?: string;
+  /** Symbol to display when checked (default: "check") */
+  symbol?: CheckboxSymbol;
+  /** Whether checked by default */
+  defaultChecked?: boolean;
+}
+
+/**
+ * Options for creating a radio button group.
+ */
+export interface RadioGroupOptions extends FieldOptions {
+  /** Available option values (required) */
+  options: string[];
+  /** Symbol to display when selected (default: "circle") */
+  symbol?: RadioSymbol;
+  /** Default selected value */
+  defaultValue?: string;
+}
+
+/**
+ * Options for creating a dropdown (combo box).
+ */
+export interface DropdownOptions extends FieldOptions {
+  /** Available options (required) */
+  options: string[];
+  /** Font for text rendering */
+  font?: EmbeddedFont;
+  /** Font size in points */
+  fontSize?: number;
+  /** Text color */
+  color?: Color;
+  /** Whether user can type custom values */
+  editable?: boolean;
+  /** Default selected value */
+  defaultValue?: string;
+}
+
+/**
+ * Options for creating a list box.
+ */
+export interface ListboxOptions extends FieldOptions {
+  /** Available options (required) */
+  options: string[];
+  /** Font for text rendering */
+  font?: EmbeddedFont;
+  /** Font size in points */
+  fontSize?: number;
+  /** Text color */
+  color?: Color;
+  /** Whether multiple selection is allowed */
+  multiSelect?: boolean;
+  /** Default selected value(s) */
+  defaultValue?: string[];
+}
+
+/**
+ * Options for creating a signature field.
+ */
+export interface SignatureFieldOptions extends FieldOptions {
+  // Signature fields typically don't have styling options since
+  // they are usually invisible or show signature appearance after signing.
+  // Extend FieldOptions for consistency with border/background.
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -295,43 +415,36 @@ export class PDFForm {
   // ─────────────────────────────────────────────────────────────────────────────
 
   /**
-   * Options for creating a signature field.
-   */
-  /**
    * Create a new signature field.
    *
    * Creates an empty (unsigned) signature field that can later be signed.
-   * The field is added to the AcroForm and is invisible by default.
+   * The field is created with an empty /Kids array. Widget properties
+   * (page, rect, etc.) are set by PDFSignature during signing.
    *
    * @param name Field name (must be unique)
-   * @param pageRef Reference to the page where the field widget will be placed
+   * @param options Signature field options
    * @returns The created signature field
    *
    * @example
    * ```typescript
    * const form = await pdf.getForm();
-   * const sigField = form.createSignatureField("Signature1", pageRef);
+   * const sigField = form.createSignatureField("Signature1");
    * // Later: sign the field via PDFSignature
    * ```
    */
-  createSignatureField(name: string, pageRef: PdfRef): SignatureField {
-    // Check if name already exists
-    if (this.fieldsByName.has(name)) {
-      throw new Error(`Field "${name}" already exists`);
-    }
+  createSignatureField(name: string, options: SignatureFieldOptions = {}): SignatureField {
+    this.validateUniqueName(name);
 
-    // Create merged field + widget dictionary
-    // PDF allows merging field dict and widget annotation into one object
+    // Create field dictionary with /Kids array (like other field types)
+    // Widget properties are added by PDFSignature during signing
     const fieldDict = PdfDict.of({
       FT: PdfName.of("Sig"),
       T: PdfString.fromString(name),
-      // Widget annotation properties
-      Type: PdfName.of("Annot"),
-      Subtype: PdfName.of("Widget"),
-      F: PdfNumber.of(132), // Print + Locked (4 + 128)
-      P: pageRef,
-      Rect: new PdfArray([PdfNumber.of(0), PdfNumber.of(0), PdfNumber.of(0), PdfNumber.of(0)]), // Invisible
+      Kids: new PdfArray([]),
     });
+
+    // Store styling metadata (even though sig fields are usually invisible)
+    this.storeFieldStyling(fieldDict, options);
 
     // Register the field and add to AcroForm
     const fieldRef = this._ctx.registry.register(fieldDict);
@@ -351,6 +464,566 @@ export class PDFForm {
     this.fieldsByName.set(name, field);
 
     return field;
+  }
+
+  /**
+   * Create a new text field.
+   *
+   * Creates a text field with an empty /Kids array. Use `page.drawField()` to
+   * add widgets that place the field on pages.
+   *
+   * @param name Field name (must be unique)
+   * @param options Text field options
+   * @returns The created text field
+   *
+   * @example
+   * ```typescript
+   * const nameField = form.createTextField("name", {
+   *   fontSize: 12,
+   *   maxLength: 100,
+   *   defaultValue: "John Doe",
+   * });
+   *
+   * await page.drawField(nameField, { x: 100, y: 700, width: 200, height: 24 });
+   * ```
+   */
+  createTextField(name: string, options: TextFieldOptions = {}): TextField {
+    this.validateUniqueName(name);
+
+    // Build field flags
+    let flags = 0;
+
+    if (options.multiline) {
+      flags |= FieldFlags.MULTILINE;
+    }
+
+    if (options.password) {
+      flags |= FieldFlags.PASSWORD;
+    }
+
+    if (options.comb && options.maxLength && options.maxLength > 0) {
+      flags |= FieldFlags.COMB;
+    }
+
+    // Build default appearance string
+    const da = this.buildDefaultAppearance(options.font, options.fontSize, options.color);
+
+    // Create field dictionary with /Kids array (separate widget model)
+    const fieldDict = PdfDict.of({
+      FT: PdfName.of("Tx"),
+      T: PdfString.fromString(name),
+      Kids: new PdfArray([]),
+    });
+
+    if (flags !== 0) {
+      fieldDict.set("Ff", PdfNumber.of(flags));
+    }
+
+    if (da) {
+      fieldDict.set("DA", PdfString.fromString(da));
+    }
+
+    if (options.alignment !== undefined) {
+      fieldDict.set("Q", PdfNumber.of(options.alignment));
+    }
+
+    if (options.maxLength !== undefined && options.maxLength > 0) {
+      fieldDict.set("MaxLen", PdfNumber.of(options.maxLength));
+    }
+
+    if (options.defaultValue !== undefined) {
+      fieldDict.set("V", PdfString.fromString(options.defaultValue));
+      fieldDict.set("DV", PdfString.fromString(options.defaultValue));
+    }
+
+    // Register font in form resources if embedded font provided
+    if (options.font) {
+      this.registerFontInFormResources(options.font);
+    }
+
+    // Register and add to form
+    const fieldRef = this._ctx.registry.register(fieldDict);
+    this._acroForm.addField(fieldRef);
+
+    // Create the TextField instance
+    const field = createFormField(
+      fieldDict,
+      fieldRef,
+      this._ctx.registry,
+      this._acroForm,
+      name,
+    ) as TextField;
+
+    // Apply styling options
+    if (options.font) {
+      field.setFont(options.font);
+    }
+
+    if (options.fontSize !== undefined) {
+      field.setFontSize(options.fontSize);
+    }
+
+    if (options.color) {
+      const [r, g, b] = colorToArray(options.color);
+      field.setTextColor(r, g ?? 0, b ?? 0);
+    }
+
+    // Store styling metadata
+    this.storeFieldStyling(fieldDict, options);
+
+    // Add to cache
+    this.allFields.push(field);
+    this.fieldsByName.set(name, field);
+
+    return field;
+  }
+
+  /**
+   * Create a new checkbox field.
+   *
+   * @param name Field name (must be unique)
+   * @param options Checkbox options
+   * @returns The created checkbox field
+   *
+   * @example
+   * ```typescript
+   * const agreeCheckbox = form.createCheckbox("agree", {
+   *   onValue: "Yes",
+   *   symbol: "check",
+   *   defaultChecked: true,
+   * });
+   *
+   * await page.drawField(agreeCheckbox, { x: 100, y: 650, width: 18, height: 18 });
+   * ```
+   */
+  createCheckbox(name: string, options: CheckboxOptions = {}): CheckboxField {
+    this.validateUniqueName(name);
+
+    const onValue = options.onValue ?? "Yes";
+    const isChecked = options.defaultChecked ?? false;
+
+    // Button field type without Radio or Pushbutton flags = checkbox
+    // Create field dictionary with /Kids array (separate widget model)
+    const fieldDict = PdfDict.of({
+      FT: PdfName.of("Btn"),
+      T: PdfString.fromString(name),
+      Kids: new PdfArray([]),
+      V: PdfName.of(isChecked ? onValue : "Off"),
+    });
+
+    if (isChecked) {
+      fieldDict.set("DV", PdfName.of(onValue));
+    }
+
+    // Store symbol preference as metadata on field
+    if (options.symbol) {
+      // Store in custom key for appearance generation
+      fieldDict.set("_Symbol", PdfName.of(options.symbol));
+    }
+
+    // Store styling metadata
+    this.storeFieldStyling(fieldDict, options);
+
+    // Register and add to form
+    const fieldRef = this._ctx.registry.register(fieldDict);
+    this._acroForm.addField(fieldRef);
+
+    // Create the CheckboxField instance
+    const field = createFormField(
+      fieldDict,
+      fieldRef,
+      this._ctx.registry,
+      this._acroForm,
+      name,
+    ) as CheckboxField;
+
+    // Add to cache
+    this.allFields.push(field);
+    this.fieldsByName.set(name, field);
+
+    return field;
+  }
+
+  /**
+   * Create a new radio button group.
+   *
+   * Radio groups must have at least one option. Each option gets its own widget
+   * when you call `page.drawField()` with the `option` parameter.
+   *
+   * @param name Field name (must be unique)
+   * @param options Radio group options (options array is required)
+   * @returns The created radio field
+   *
+   * @example
+   * ```typescript
+   * const paymentRadio = form.createRadioGroup("payment", {
+   *   options: ["Credit Card", "PayPal", "Bank Transfer"],
+   *   defaultValue: "Credit Card",
+   * });
+   *
+   * // Each option gets its own widget
+   * await page.drawField(paymentRadio, { x: 100, y: 550, width: 16, height: 16, option: "Credit Card" });
+   * await page.drawField(paymentRadio, { x: 100, y: 520, width: 16, height: 16, option: "PayPal" });
+   * await page.drawField(paymentRadio, { x: 100, y: 490, width: 16, height: 16, option: "Bank Transfer" });
+   * ```
+   */
+  createRadioGroup(name: string, options: RadioGroupOptions): RadioField {
+    this.validateUniqueName(name);
+
+    if (!options.options || options.options.length === 0) {
+      throw new Error("Radio group must have at least one option");
+    }
+
+    // Button field type with Radio flag
+    const flags = FieldFlags.RADIO;
+
+    const selectedValue = options.defaultValue ?? null;
+
+    // Create field dictionary with /Kids array (separate widget model)
+    const fieldDict = PdfDict.of({
+      FT: PdfName.of("Btn"),
+      T: PdfString.fromString(name),
+      Ff: PdfNumber.of(flags),
+      Kids: new PdfArray([]),
+    });
+
+    if (selectedValue && options.options.includes(selectedValue)) {
+      fieldDict.set("V", PdfName.of(selectedValue));
+      fieldDict.set("DV", PdfName.of(selectedValue));
+    } else {
+      fieldDict.set("V", PdfName.of("Off"));
+    }
+
+    // Store options for validation in drawField
+    fieldDict.set("Opt", PdfArray.of(...options.options.map(o => PdfString.fromString(o))));
+
+    // Store symbol preference
+    if (options.symbol) {
+      fieldDict.set("_Symbol", PdfName.of(options.symbol));
+    }
+
+    // Store styling metadata
+    this.storeFieldStyling(fieldDict, options);
+
+    // Register and add to form
+    const fieldRef = this._ctx.registry.register(fieldDict);
+    this._acroForm.addField(fieldRef);
+
+    // Create the RadioField instance
+    const field = createFormField(
+      fieldDict,
+      fieldRef,
+      this._ctx.registry,
+      this._acroForm,
+      name,
+    ) as RadioField;
+
+    // Add to cache
+    this.allFields.push(field);
+    this.fieldsByName.set(name, field);
+
+    return field;
+  }
+
+  /**
+   * Create a new dropdown (combo box) field.
+   *
+   * @param name Field name (must be unique)
+   * @param options Dropdown options (options array is required)
+   * @returns The created dropdown field
+   *
+   * @example
+   * ```typescript
+   * const countryDropdown = form.createDropdown("country", {
+   *   options: ["USA", "Canada", "UK", "Germany", "France"],
+   *   defaultValue: "USA",
+   *   fontSize: 11,
+   * });
+   *
+   * await page.drawField(countryDropdown, { x: 100, y: 600, width: 200, height: 24 });
+   * ```
+   */
+  createDropdown(name: string, options: DropdownOptions): DropdownField {
+    this.validateUniqueName(name);
+
+    if (!options.options || options.options.length === 0) {
+      throw new Error("Dropdown must have at least one option");
+    }
+
+    // Choice field type with Combo flag
+    let flags = FieldFlags.COMBO;
+
+    if (options.editable) {
+      flags |= FieldFlags.EDIT;
+    }
+
+    // Build default appearance string
+    const da = this.buildDefaultAppearance(options.font, options.fontSize, options.color);
+
+    // Create field dictionary with /Kids array (separate widget model)
+    const fieldDict = PdfDict.of({
+      FT: PdfName.of("Ch"),
+      T: PdfString.fromString(name),
+      Ff: PdfNumber.of(flags),
+      Kids: new PdfArray([]),
+      Opt: PdfArray.of(...options.options.map(o => PdfString.fromString(o))),
+    });
+
+    if (da) {
+      fieldDict.set("DA", PdfString.fromString(da));
+    }
+
+    if (options.defaultValue !== undefined && options.options.includes(options.defaultValue)) {
+      fieldDict.set("V", PdfString.fromString(options.defaultValue));
+      fieldDict.set("DV", PdfString.fromString(options.defaultValue));
+    }
+
+    // Register font in form resources if embedded font provided
+    if (options.font) {
+      this.registerFontInFormResources(options.font);
+    }
+
+    // Store styling metadata
+    this.storeFieldStyling(fieldDict, options);
+
+    // Register and add to form
+    const fieldRef = this._ctx.registry.register(fieldDict);
+    this._acroForm.addField(fieldRef);
+
+    // Create the DropdownField instance
+    const field = createFormField(
+      fieldDict,
+      fieldRef,
+      this._ctx.registry,
+      this._acroForm,
+      name,
+    ) as DropdownField;
+
+    // Apply styling options
+    if (options.font) {
+      field.setFont(options.font);
+    }
+
+    if (options.fontSize !== undefined) {
+      field.setFontSize(options.fontSize);
+    }
+
+    if (options.color) {
+      const [r, g, b] = colorToArray(options.color);
+      field.setTextColor(r, g ?? 0, b ?? 0);
+    }
+
+    // Add to cache
+    this.allFields.push(field);
+    this.fieldsByName.set(name, field);
+
+    return field;
+  }
+
+  /**
+   * Create a new list box field.
+   *
+   * @param name Field name (must be unique)
+   * @param options Listbox options (options array is required)
+   * @returns The created listbox field
+   *
+   * @example
+   * ```typescript
+   * const colorListbox = form.createListbox("colors", {
+   *   options: ["Red", "Green", "Blue", "Yellow"],
+   *   multiSelect: true,
+   *   defaultValue: ["Red", "Blue"],
+   * });
+   *
+   * await page.drawField(colorListbox, { x: 100, y: 400, width: 150, height: 100 });
+   * ```
+   */
+  createListbox(name: string, options: ListboxOptions): ListBoxField {
+    this.validateUniqueName(name);
+
+    if (!options.options || options.options.length === 0) {
+      throw new Error("Listbox must have at least one option");
+    }
+
+    // Choice field type without Combo flag = list box
+    let flags = 0;
+
+    if (options.multiSelect) {
+      flags |= FieldFlags.MULTI_SELECT;
+    }
+
+    // Build default appearance string
+    const da = this.buildDefaultAppearance(options.font, options.fontSize, options.color);
+
+    // Create field dictionary with /Kids array (separate widget model)
+    const fieldDict = PdfDict.of({
+      FT: PdfName.of("Ch"),
+      T: PdfString.fromString(name),
+      Kids: new PdfArray([]),
+      Opt: PdfArray.of(...options.options.map(o => PdfString.fromString(o))),
+    });
+
+    if (flags !== 0) {
+      fieldDict.set("Ff", PdfNumber.of(flags));
+    }
+
+    if (da) {
+      fieldDict.set("DA", PdfString.fromString(da));
+    }
+
+    // Handle default value(s)
+    if (options.defaultValue && options.defaultValue.length > 0) {
+      const validDefaults = options.defaultValue.filter(v => options.options.includes(v));
+
+      if (validDefaults.length === 1) {
+        fieldDict.set("V", PdfString.fromString(validDefaults[0]));
+        fieldDict.set("DV", PdfString.fromString(validDefaults[0]));
+      } else if (validDefaults.length > 1) {
+        fieldDict.set("V", PdfArray.of(...validDefaults.map(v => PdfString.fromString(v))));
+        fieldDict.set("DV", PdfArray.of(...validDefaults.map(v => PdfString.fromString(v))));
+
+        // Set /I (selection indices)
+        const indices = validDefaults
+          .map(v => options.options.indexOf(v))
+          .filter(i => i >= 0)
+          .sort((a, b) => a - b);
+        fieldDict.set("I", PdfArray.of(...indices.map(i => PdfNumber.of(i))));
+      }
+    }
+
+    // Register font in form resources if embedded font provided
+    if (options.font) {
+      this.registerFontInFormResources(options.font);
+    }
+
+    // Store styling metadata
+    this.storeFieldStyling(fieldDict, options);
+
+    // Register and add to form
+    const fieldRef = this._ctx.registry.register(fieldDict);
+    this._acroForm.addField(fieldRef);
+
+    // Create the ListBoxField instance
+    const field = createFormField(
+      fieldDict,
+      fieldRef,
+      this._ctx.registry,
+      this._acroForm,
+      name,
+    ) as ListBoxField;
+
+    // Apply styling options
+    if (options.font) {
+      field.setFont(options.font);
+    }
+
+    if (options.fontSize !== undefined) {
+      field.setFontSize(options.fontSize);
+    }
+
+    if (options.color) {
+      const [r, g, b] = colorToArray(options.color);
+      field.setTextColor(r, g ?? 0, b ?? 0);
+    }
+
+    // Add to cache
+    this.allFields.push(field);
+    this.fieldsByName.set(name, field);
+
+    return field;
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Field Creation Helpers
+  // ─────────────────────────────────────────────────────────────────────────────
+
+  /**
+   * Validate that a field name is unique.
+   */
+  private validateUniqueName(name: string): void {
+    if (this.fieldsByName.has(name)) {
+      throw new Error(`Field "${name}" already exists`);
+    }
+  }
+
+  /**
+   * Build a default appearance (DA) string for text-based fields.
+   */
+  private buildDefaultAppearance(
+    font?: EmbeddedFont,
+    fontSize?: number,
+    color?: Color,
+  ): string | null {
+    const parts: string[] = [];
+
+    // Font and size
+    if (font) {
+      // Font name will be determined when registered
+      parts.push(`/F1 ${fontSize ?? 0} Tf`);
+    } else if (fontSize !== undefined) {
+      parts.push(`/Helv ${fontSize} Tf`);
+    }
+
+    // Color
+    if (color) {
+      const colorArray = colorToArray(color);
+
+      if (colorArray.length === 1) {
+        parts.push(`${colorArray[0]} g`);
+      } else if (colorArray.length === 3) {
+        parts.push(`${colorArray[0]} ${colorArray[1]} ${colorArray[2]} rg`);
+      } else if (colorArray.length === 4) {
+        parts.push(`${colorArray[0]} ${colorArray[1]} ${colorArray[2]} ${colorArray[3]} k`);
+      }
+    } else {
+      parts.push("0 g"); // Default to black
+    }
+
+    return parts.length > 0 ? parts.join(" ") : null;
+  }
+
+  /**
+   * Register an embedded font in the form's default resources.
+   */
+  private registerFontInFormResources(font: EmbeddedFont): void {
+    // Prepare the font if not already done
+    const ctx = this._ctx;
+
+    // Get or create font reference from PDFFonts
+    const fontRef = ctx.registry.register(
+      PdfDict.of({
+        Type: PdfName.of("Font"),
+        Subtype: PdfName.of("Type0"),
+        BaseFont: PdfName.of(font.baseFontName),
+        Encoding: PdfName.of("Identity-H"),
+      }),
+    );
+
+    // Add to AcroForm resources
+    this._acroForm.addFontToResources(fontRef);
+  }
+
+  /**
+   * Store field styling metadata for appearance generation.
+   */
+  private storeFieldStyling(fieldDict: PdfDict, options: FieldOptions): void {
+    if (options.backgroundColor) {
+      const bg = colorToArray(options.backgroundColor);
+      fieldDict.set("_BG", PdfArray.of(...bg.map(v => PdfNumber.of(v))));
+    }
+
+    if (options.borderColor) {
+      const bc = colorToArray(options.borderColor);
+      fieldDict.set("_BC", PdfArray.of(...bc.map(v => PdfNumber.of(v))));
+    }
+
+    if (options.borderWidth !== undefined) {
+      fieldDict.set("_BW", PdfNumber.of(options.borderWidth));
+    }
+
+    if (options.rotate) {
+      fieldDict.set("_R", PdfNumber.of(options.rotate.angle));
+    }
   }
 
   // ─────────────────────────────────────────────────────────────────────────────

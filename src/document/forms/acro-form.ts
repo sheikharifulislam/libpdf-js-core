@@ -720,6 +720,71 @@ export class AcroForm implements AcroFormLike {
   }
 
   // ─────────────────────────────────────────────────────────────────────────────
+  // Font Management
+  // ─────────────────────────────────────────────────────────────────────────────
+
+  /**
+   * Add a font to the AcroForm's Default Resources (/DR) dictionary.
+   *
+   * This is called automatically when creating fields with embedded fonts.
+   * The font is added to /DR/Font with an auto-generated name if not already present.
+   *
+   * @param fontRef Reference to the font dictionary
+   * @param name Optional name for the font (e.g., "F1"). If not provided, one is generated.
+   * @returns The font name used in the /DR dictionary
+   */
+  addFontToResources(fontRef: PdfRef, name?: string): string {
+    // Ensure /DR exists
+    let dr = this.dict.getDict("DR");
+
+    if (!dr) {
+      dr = new PdfDict();
+      this.dict.set("DR", dr);
+    }
+
+    // Ensure /DR/Font exists
+    let fontsDict = dr.getDict("Font");
+
+    if (!fontsDict) {
+      fontsDict = new PdfDict();
+      dr.set("Font", fontsDict);
+    }
+
+    // Check if font is already in resources (PdfRef is interned, so === works)
+    for (const key of fontsDict.keys()) {
+      const existing = fontsDict.get(key.value);
+
+      if (existing instanceof PdfRef && existing === fontRef) {
+        return key.value;
+      }
+    }
+
+    // Generate a name if not provided
+    const fontName = name ?? this.generateFontName(fontsDict);
+    fontsDict.set(fontName, fontRef);
+
+    // Clear existing fonts cache since we modified DR
+    this.existingFontsCache = null;
+
+    return fontName;
+  }
+
+  /**
+   * Generate a unique font name for the /DR/Font dictionary.
+   */
+  private generateFontName(fontsDict: PdfDict): string {
+    let counter = 1;
+    let name = `F${counter}`;
+
+    while (fontsDict.has(name)) {
+      counter++;
+      name = `F${counter}`;
+    }
+
+    return name;
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────────
   // Field Creation
   // ─────────────────────────────────────────────────────────────────────────────
 

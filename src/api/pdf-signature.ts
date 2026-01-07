@@ -308,11 +308,20 @@ export class PDFSignature {
 
     if (!fieldDict) {
       fieldDict = form
-        .createSignatureField(fieldName ?? generateUniqueName(existingNames, "Signature_"), pageRef)
+        .createSignatureField(fieldName ?? generateUniqueName(existingNames, "Signature_"))
         .getDict();
     }
 
+    // Set signature value
     fieldDict.set("V", signatureRef);
+
+    // Convert to merged field+widget model (common for invisible signatures)
+    // Remove /Kids if present (we're merging into a single object)
+    fieldDict.delete("Kids");
+
+    // Add widget annotation properties
+    fieldDict.set("Type", PdfName.of("Annot"));
+    fieldDict.set("Subtype", PdfName.of("Widget"));
     fieldDict.set("F", PdfNumber.of(132)); // Print + Locked (4 + 128)
     fieldDict.set("P", pageRef);
     fieldDict.set(

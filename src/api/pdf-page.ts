@@ -19,8 +19,20 @@
  * ```
  */
 
+import { AcroForm } from "#src/document/forms/acro-form";
+import { AppearanceGenerator } from "#src/document/forms/appearance-generator";
+import type {
+  CheckboxField,
+  DropdownField,
+  FormField,
+  ListBoxField,
+  RadioField,
+  TextField,
+} from "#src/document/forms/fields";
+import { TerminalField } from "#src/document/forms/fields/base";
 import { PdfArray } from "#src/objects/pdf-array";
 import { PdfDict } from "#src/objects/pdf-dict";
+import { PdfName } from "#src/objects/pdf-name";
 import { PdfNumber } from "#src/objects/pdf-number";
 import { PdfRef } from "#src/objects/pdf-ref";
 import { PdfStream } from "#src/objects/pdf-stream";
@@ -59,6 +71,22 @@ export interface DrawPageOptions {
   opacity?: number;
   /** Draw as background behind existing content (default: false = foreground) */
   background?: boolean;
+}
+
+/**
+ * Options for placing a form field widget on a page.
+ */
+export interface DrawFieldOptions {
+  /** X position from left edge of page */
+  x: number;
+  /** Y position from bottom edge of page */
+  y: number;
+  /** Widget width in points */
+  width: number;
+  /** Widget height in points */
+  height: number;
+  /** Option value (required for radio groups, ignored for other types) */
+  option?: string;
 }
 
 /**
@@ -315,6 +343,282 @@ export class PDFPage {
     } else {
       this.appendContent(contentOps);
     }
+  }
+
+  /**
+   * Draw a form field widget on this page.
+   *
+   * Creates a widget annotation for the field and adds it to both the field's
+   * /Kids array and this page's /Annots array. The widget is sized and positioned
+   * according to the options.
+   *
+   * For radio groups, the `option` parameter is required and specifies which
+   * radio option this widget represents.
+   *
+   * @param field The form field to draw
+   * @param options Position, size, and option settings
+   * @throws Error if field is a radio group and option is not specified
+   *
+   * @example
+   * ```typescript
+   * // Text field
+   * await page.drawField(nameField, { x: 100, y: 700, width: 200, height: 24 });
+   *
+   * // Checkbox
+   * await page.drawField(agreeBox, { x: 100, y: 650, width: 18, height: 18 });
+   *
+   * // Radio group - each option needs its own widget
+   * await page.drawField(paymentRadio, { x: 100, y: 550, width: 16, height: 16, option: "Credit" });
+   * await page.drawField(paymentRadio, { x: 100, y: 520, width: 16, height: 16, option: "PayPal" });
+   * ```
+   */
+  async drawField(field: FormField, options: DrawFieldOptions): Promise<void> {
+    if (!this.ctx) {
+      throw new Error("Cannot draw field on page without context");
+    }
+
+    // Validate that field is a terminal field
+    if (!(field instanceof TerminalField)) {
+      throw new Error(`Cannot draw non-terminal field "${field.name}"`);
+    }
+
+    // Signature fields use merged field+widget model and are created via createSignatureField
+    if (field.type === "signature") {
+      throw new Error(
+        `Signature fields cannot be drawn with drawField. ` +
+          `Use form.createSignatureField() which creates the widget automatically.`,
+      );
+    }
+
+    // Validate radio group option requirement
+    if (field.type === "radio") {
+      if (!options.option) {
+        throw new Error(`Radio group "${field.name}" requires option parameter in drawField`);
+      }
+
+      // Validate option exists
+      const radioField = field as RadioField;
+      const availableOptions = radioField.getOptions();
+
+      // For new radio fields, options might be in /Opt array
+      const fieldDict = field.acroField();
+      const optArray = fieldDict.getArray("Opt");
+
+      if (optArray) {
+        const optValues: string[] = [];
+
+        for (let i = 0; i < optArray.length; i++) {
+          const item = optArray.at(i);
+
+          if (item?.type === "string") {
+            optValues.push((item as unknown as { asString(): string }).asString());
+          }
+        }
+
+        if (!optValues.includes(options.option)) {
+          throw new Error(
+            `Invalid option "${options.option}" for radio group "${field.name}". Available: ${optValues.join(", ")}`,
+          );
+        }
+      } else if (availableOptions.length > 0 && !availableOptions.includes(options.option)) {
+        throw new Error(
+          `Invalid option "${options.option}" for radio group "${field.name}". Available: ${availableOptions.join(", ")}`,
+        );
+      }
+    }
+
+    // Create widget annotation dictionary
+    const widgetDict = this.buildWidgetDict(field, options);
+
+    // Add widget to field's /Kids array
+    const widget = field.addWidget(widgetDict);
+
+    // Add widget ref to page's /Annots array
+    if (!widget.ref) {
+      throw new Error("Widget annotation must have a reference");
+    }
+    this.addAnnotation(widget.ref);
+
+    // Generate appearance stream for the widget
+    await this.generateWidgetAppearance(field, widget, options);
+  }
+
+  /**
+   * Build a widget annotation dictionary for a field.
+   */
+  private buildWidgetDict(field: TerminalField, options: DrawFieldOptions): PdfDict {
+    const { x, y, width, height } = options;
+
+    const fieldRef = field.getRef();
+    if (!fieldRef) {
+      throw new Error("Field must be registered before adding widgets");
+    }
+
+    // Create basic widget dict
+    const widgetDict = PdfDict.of({
+      Type: PdfName.of("Annot"),
+      Subtype: PdfName.of("Widget"),
+      Rect: new PdfArray([
+        PdfNumber.of(x),
+        PdfNumber.of(y),
+        PdfNumber.of(x + width),
+        PdfNumber.of(y + height),
+      ]),
+      P: this.ref,
+      Parent: fieldRef,
+      F: PdfNumber.of(4), // Print flag
+    });
+
+    // Get field's styling metadata
+    const fieldDict = field.acroField();
+
+    // Build MK (appearance characteristics) dictionary
+    const mk = new PdfDict();
+    let hasMk = false;
+
+    // Background color
+    const bg = fieldDict.getArray("_BG");
+
+    if (bg) {
+      mk.set("BG", bg);
+      hasMk = true;
+    }
+
+    // Border color
+    const bc = fieldDict.getArray("_BC");
+
+    if (bc) {
+      mk.set("BC", bc);
+      hasMk = true;
+    }
+
+    // Rotation
+    const r = fieldDict.getNumber("_R");
+
+    if (r) {
+      mk.set("R", r);
+      hasMk = true;
+    }
+
+    if (hasMk) {
+      widgetDict.set("MK", mk);
+    }
+
+    // Border style
+    const bw = fieldDict.getNumber("_BW");
+
+    if (bw) {
+      const bs = PdfDict.of({
+        W: bw,
+        S: PdfName.of("S"), // Solid
+      });
+      widgetDict.set("BS", bs);
+    }
+
+    // For radio buttons, set the appearance state
+    if (field.type === "radio" && options.option) {
+      const radioField = field as RadioField;
+      const currentValue = radioField.getValue();
+
+      // Set appearance state to option value if selected, otherwise "Off"
+      widgetDict.set("AS", PdfName.of(currentValue === options.option ? options.option : "Off"));
+    }
+
+    // For checkboxes, set the appearance state
+    if (field.type === "checkbox") {
+      const checkboxField = field as CheckboxField;
+      const isChecked = checkboxField.isChecked();
+      const onValue = checkboxField.getOnValue();
+      widgetDict.set("AS", PdfName.of(isChecked ? onValue : "Off"));
+    }
+
+    return widgetDict;
+  }
+
+  /**
+   * Generate appearance stream for a widget.
+   */
+  private async generateWidgetAppearance(
+    field: TerminalField,
+    widget: import("#src/document/forms/widget-annotation").WidgetAnnotation,
+    options: DrawFieldOptions,
+  ): Promise<void> {
+    if (!this.ctx) {
+      return;
+    }
+
+    // We need access to AcroForm for appearance generation
+    // Load it via catalog
+    const catalogDict = this.ctx.catalog.getDict();
+    const acroForm = await AcroForm.load(catalogDict, this.ctx.registry);
+
+    if (!acroForm) {
+      return;
+    }
+
+    const generator = new AppearanceGenerator(acroForm, this.ctx.registry);
+
+    switch (field.type) {
+      case "text": {
+        const textField = field as TextField;
+        const stream = generator.generateTextAppearance(textField, widget);
+        widget.setNormalAppearance(stream);
+        break;
+      }
+
+      case "checkbox": {
+        const checkboxField = field as CheckboxField;
+        const onValue = checkboxField.getOnValue();
+        const { on, off } = generator.generateCheckboxAppearance(checkboxField, widget, onValue);
+        widget.setNormalAppearance(on, onValue);
+        widget.setNormalAppearance(off, "Off");
+        break;
+      }
+
+      case "radio": {
+        const radioField = field as RadioField;
+        // options.option is validated in drawField() before reaching here
+        if (!options.option) {
+          throw new Error("Radio field requires an option value");
+        }
+        const { selected, off } = generator.generateRadioAppearance(
+          radioField,
+          widget,
+          options.option,
+        );
+        widget.setNormalAppearance(selected, options.option);
+        widget.setNormalAppearance(off, "Off");
+        break;
+      }
+
+      case "dropdown": {
+        const dropdownField = field as DropdownField;
+        const stream = generator.generateDropdownAppearance(dropdownField, widget);
+        widget.setNormalAppearance(stream);
+        break;
+      }
+
+      case "listbox": {
+        const listboxField = field as ListBoxField;
+        const stream = generator.generateListBoxAppearance(listboxField, widget);
+        widget.setNormalAppearance(stream);
+        break;
+      }
+    }
+  }
+
+  /**
+   * Add an annotation reference to the page's /Annots array.
+   */
+  private addAnnotation(annotRef: PdfRef): void {
+    let annots = this.dict.getArray("Annots");
+
+    if (!annots) {
+      annots = new PdfArray([]);
+      this.dict.set("Annots", annots);
+    }
+
+    annots.push(annotRef);
   }
 
   // ─────────────────────────────────────────────────────────────────────────────

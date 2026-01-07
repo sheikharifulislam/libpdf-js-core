@@ -17,12 +17,14 @@ import { Scanner } from "#src/io/scanner";
 import * as LayerUtils from "#src/layers/index";
 import type { FlattenLayersResult, LayerInfo } from "#src/layers/types";
 import { PdfArray } from "#src/objects/pdf-array";
+import { PdfBool } from "#src/objects/pdf-bool";
 import { PdfDict } from "#src/objects/pdf-dict";
 import { PdfName } from "#src/objects/pdf-name";
 import { PdfNumber } from "#src/objects/pdf-number";
 import type { PdfObject } from "#src/objects/pdf-object";
 import { PdfRef } from "#src/objects/pdf-ref";
 import { PdfStream } from "#src/objects/pdf-stream";
+import { PdfString } from "#src/objects/pdf-string";
 import { DocumentParser, type ParseOptions } from "#src/parser/document-parser";
 import { XRefParser } from "#src/parser/xref-parser";
 import type { SignOptions, SignResult } from "#src/signatures/types";
@@ -1131,16 +1133,16 @@ export class PDF {
   /**
    * Get or create the document's interactive form.
    *
-   * If the document has no AcroForm, one is created and added to the catalog.
-   * This is useful when you need to add fields to a document that doesn't
-   * already have a form.
+   * If the document has no AcroForm, one is created and added to the catalog
+   * with proper default resources (Helvetica and ZapfDingbats fonts) and
+   * default appearance settings.
    *
    * @returns The form (never null)
    *
    * @example
    * ```typescript
    * const form = await pdf.getOrCreateForm();
-   * const sigField = form.createSignatureField("Signature1", pageRef);
+   * const nameField = form.createTextField("name", { fontSize: 12 });
    * ```
    */
   async getOrCreateForm(): Promise<PDFForm> {
@@ -1150,16 +1152,44 @@ export class PDF {
       return existing;
     }
 
-    // Create minimal AcroForm dictionary
+    // Create standard Helvetica font dictionary
+    const helveticaDict = PdfDict.of({
+      Type: PdfName.of("Font"),
+      Subtype: PdfName.of("Type1"),
+      BaseFont: PdfName.of("Helvetica"),
+    });
+
+    // Create ZapfDingbats font dictionary (for checkboxes/radios)
+    const zapfDingbatsDict = PdfDict.of({
+      Type: PdfName.of("Font"),
+      Subtype: PdfName.of("Type1"),
+      BaseFont: PdfName.of("ZapfDingbats"),
+    });
+
+    // Create Font dictionary with standard fonts
+    const fontsDict = PdfDict.of({
+      Helv: helveticaDict,
+      ZaDb: zapfDingbatsDict,
+    });
+
+    // Create Default Resources dictionary
+    const drDict = PdfDict.of({
+      Font: fontsDict,
+    });
+
+    // Create AcroForm dictionary with proper defaults
     const acroFormDict = PdfDict.of({
       Fields: new PdfArray([]),
-      SigFlags: PdfNumber.of(3), // SignaturesExist + AppendOnly
+      DR: drDict,
+      DA: PdfString.fromString("/Helv 0 Tf 0 g"),
+      NeedAppearances: PdfBool.of(false),
     });
 
     const acroFormRef = this.ctx.registry.register(acroFormDict);
 
     // Add to catalog
     const catalog = await this.getCatalog();
+
     if (catalog) {
       catalog.set("AcroForm", acroFormRef);
     }
