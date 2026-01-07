@@ -177,9 +177,18 @@ export class BinaryWriter extends ByteWriter {
    * Get the minimum number of bytes needed to represent an offset value.
    */
   static offsetSize(maxValue: number): number {
-    if (maxValue <= 0xff) return 1;
-    if (maxValue <= 0xffff) return 2;
-    if (maxValue <= 0xffffff) return 3;
+    if (maxValue <= 0xff) {
+      return 1;
+    }
+
+    if (maxValue <= 0xffff) {
+      return 2;
+    }
+
+    if (maxValue <= 0xffffff) {
+      return 3;
+    }
+
     return 4;
   }
 }

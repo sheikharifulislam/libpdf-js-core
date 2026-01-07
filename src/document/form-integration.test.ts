@@ -102,7 +102,9 @@ describe("Form Integration: Embedded Fonts", () => {
     let count = 0;
 
     for (const field of textFields) {
-      if (field.isReadOnly()) continue;
+      if (field.isReadOnly()) {
+        continue;
+      }
 
       // Alternate between fonts
       if (count % 2 === 0) {
@@ -114,7 +116,9 @@ describe("Form Integration: Embedded Fonts", () => {
       }
       count++;
 
-      if (count >= 6) break;
+      if (count >= 6) {
+        break;
+      }
     }
 
     await form!.updateAppearances();
@@ -197,7 +201,9 @@ describe("Form Integration: Text Colors", () => {
 
     let colorIndex = 0;
     for (const field of textFields.slice(0, 6)) {
-      if (field.isReadOnly()) continue;
+      if (field.isReadOnly()) {
+        continue;
+      }
 
       const color = colors[colorIndex % colors.length];
       field.setTextColor(color.r, color.g, color.b);
@@ -821,7 +827,10 @@ describe("Form Integration: Edge Cases", () => {
     console.log(`  Comb fields found: ${combFields.length}`);
 
     for (const field of combFields) {
-      if (field.isReadOnly()) continue;
+      if (field.isReadOnly()) {
+        continue;
+      }
+
       const maxLen = field.maxLength ?? 10;
       field.setValue("A".repeat(Math.min(maxLen, 5)));
     }

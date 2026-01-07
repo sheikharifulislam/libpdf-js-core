@@ -984,10 +984,18 @@ export class AppearanceGenerator {
       // The formula matches PDFBox: upperRightY - highlightBoxHeight * (selectedIndex - topIndex + 1) + 2
       const visibleRow = selectedIndex - topIndex;
 
-      if (visibleRow < 0) continue; // Before visible area
+      if (visibleRow < 0) {
+        continue;
+      }
+
+      // Before visible area
       const highlightY = paddingEdge.y + paddingEdge.height - lineHeight * (visibleRow + 1) + 2;
 
-      if (highlightY < paddingEdge.y - lineHeight) continue; // Below visible area
+      if (highlightY < paddingEdge.y - lineHeight) {
+        continue;
+      }
+
+      // Below visible area
       content.add(
         setNonStrokingRGB(
           DEFAULT_HIGHLIGHT_COLOR.r,

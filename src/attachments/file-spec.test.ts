@@ -155,7 +155,10 @@ describe("getEmbeddedFileStream", () => {
     const fileSpec = PdfDict.of({ EF: ef });
 
     const resolver = async (ref: PdfRef) => {
-      if (ref.objectNumber === 10) return stream;
+      if (ref.objectNumber === 10) {
+        return stream;
+      }
+
       return null;
     };
 
@@ -222,7 +225,10 @@ describe("parseFileSpec", () => {
     });
 
     const resolver = async (ref: PdfRef) => {
-      if (ref.objectNumber === 10) return stream;
+      if (ref.objectNumber === 10) {
+        return stream;
+      }
+
       return null;
     };
 
@@ -255,7 +261,10 @@ describe("parseFileSpec", () => {
     const fileSpec = PdfDict.of({ EF: ef });
 
     const resolver = async (ref: PdfRef) => {
-      if (ref.objectNumber === 10) return stream;
+      if (ref.objectNumber === 10) {
+        return stream;
+      }
+
       return null;
     };
 

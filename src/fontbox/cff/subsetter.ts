@@ -94,7 +94,9 @@ export class CFFSubsetter {
    * Add a string to the string index, returning its SID.
    */
   private addString(str: string | undefined): number | null {
-    if (!str) return null;
+    if (!str) {
+      return null;
+    }
 
     // Check if it's a standard string
     for (let i = 0; i < STANDARD_STRINGS_COUNT; i++) {
@@ -455,7 +457,10 @@ export class CFFSubsetter {
    * Delta encode an array of values.
    */
   private deltaEncode(values: number[]): number[] {
-    if (values.length === 0) return [];
+    if (values.length === 0) {
+      return [];
+    }
+
     const result = [values[0]];
     for (let i = 1; i < values.length; i++) {
       result.push(values[i] - values[i - 1]);

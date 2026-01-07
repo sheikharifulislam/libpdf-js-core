@@ -51,7 +51,9 @@ export class ByteWriter {
       throw new Error(`ByteWriter exceeded maximum size of ${this.maxSize} bytes`);
     }
 
-    if (requiredSize <= this.buffer.length) return;
+    if (requiredSize <= this.buffer.length) {
+      return;
+    }
 
     let newSize = this.buffer.length;
     while (newSize < requiredSize) {

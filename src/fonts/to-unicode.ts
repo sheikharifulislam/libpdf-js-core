@@ -149,7 +149,10 @@ function parseBfRangeContent(content: string, map: ToUnicodeMap): void {
 
   for (const line of lines) {
     const trimmed = line.trim();
-    if (!trimmed) continue;
+
+    if (!trimmed) {
+      continue;
+    }
 
     // Try to match range with array: <lo> <hi> [<d1> <d2> ...]
     const arrayMatch = trimmed.match(/^<([0-9A-Fa-f]+)>\s*<([0-9A-Fa-f]+)>\s*\[([\s\S]*)\]$/);

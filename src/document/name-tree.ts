@@ -47,8 +47,14 @@ function extractKey(obj: PdfObject | undefined): string | null {
  * Uses lexicographic comparison (same as PDF spec).
  */
 function compareKeys(a: string, b: string): number {
-  if (a < b) return -1;
-  if (a > b) return 1;
+  if (a < b) {
+    return -1;
+  }
+
+  if (a > b) {
+    return 1;
+  }
+
   return 0;
 }
 

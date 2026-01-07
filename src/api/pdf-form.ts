@@ -10,8 +10,6 @@
  * - Memory usage is proportional to field count
  * - Call `reloadFields()` if the form structure changes externally
  *
- * **Note on async**: All field value mutations (setValue, check, fill, etc.)
- * are async because they regenerate appearance streams. Always await these calls.
  *
  * @example
  * ```typescript
@@ -253,9 +251,13 @@ export class PDFForm {
    */
   static async load(ctx: PDFContext): Promise<PDFForm | null> {
     const acroForm = await AcroForm.load(ctx.catalog.getDict(), ctx.registry, ctx.pages);
-    if (!acroForm) return null;
+
+    if (!acroForm) {
+      return null;
+    }
 
     const fields = await acroForm.getFields();
+
     return new PDFForm(acroForm, ctx, fields);
   }
 
