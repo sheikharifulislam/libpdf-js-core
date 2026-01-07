@@ -32,7 +32,7 @@ There's no single, comprehensive library that handles both robust parsing *and* 
 bun install
 
 # Run tests
-bun test
+bun run test
 
 # Type check
 bun run typecheck

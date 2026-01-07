@@ -20,13 +20,13 @@ This project uses AI agent-assisted development. This means:
 ## Commands
 
 ```bash
-bun install                    # Install dependencies
-bun test                       # Run tests in watch mode
-bun test:run                   # Run tests once
-bun test -- --grep "pattern"   # Run specific tests
-bun run typecheck              # Type check with tsc
-bun run lint                   # Check with Biome
-bun run lint:fix               # Fix lint issues
+bun install                         # Install dependencies
+bun run test                        # Run tests in watch mode
+bun run test:run                    # Run tests once
+bun run test -- --grep "pattern"    # Run specific tests
+bun run typecheck                   # Type check with tsc
+bun run lint                        # Check with Biome
+bun run lint:fix                    # Fix lint issues
 ```
 
 ## Project Structure
