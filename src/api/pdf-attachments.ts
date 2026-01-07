@@ -155,7 +155,7 @@ export class PDFAttachments {
    * @param name - The attachment name (key in the EmbeddedFiles tree)
    * @param data - The file data
    * @param options - Attachment options (description, MIME type, dates)
-   * @throws Error if name already exists and overwrite !== true
+   * @throws {Error} if name already exists and overwrite !== true
    *
    * @example
    * ```typescript

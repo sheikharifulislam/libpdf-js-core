@@ -31,7 +31,7 @@ export interface ParseOptions {
  * @param data - Font file bytes
  * @param options - Parse options
  * @returns Parsed TrueTypeFont
- * @throws Error if the font is invalid or unsupported
+ * @throws {Error} if the font is invalid or unsupported
  */
 export function parseTTF(data: Uint8Array, options: ParseOptions = {}): TrueTypeFont {
   const scanner = new BinaryScanner(data);

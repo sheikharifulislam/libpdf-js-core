@@ -72,7 +72,7 @@ export class ByteWriter {
 
   /**
    * Ensure capacity for `needed` more bytes, doubling buffer if necessary.
-   * @throws Error if maxSize would be exceeded
+   * @throws {Error} if maxSize would be exceeded
    */
   private grow(needed: number): void {
     if (this.offset + needed <= this.buffer.length) return;

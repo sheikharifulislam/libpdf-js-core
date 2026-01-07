@@ -93,7 +93,7 @@ export class CheckboxField extends TerminalField {
    * stream after setting the value.
    *
    * @param value "Off" or one of the on-values
-   * @throws Error if field is read-only or value is invalid
+   * @throws {Error} if field is read-only or value is invalid
    */
   async setValue(value: string): Promise<void> {
     this.assertWritable();

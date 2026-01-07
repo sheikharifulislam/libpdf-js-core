@@ -179,7 +179,7 @@ export class RC2 {
    * @param effectiveBits - Effective key bits (40, 64, or 128)
    * @param removePadding - Whether to remove PKCS#7 padding (default: true)
    * @returns Decrypted data
-   * @throws Error if IV or data length is invalid
+   * @throws {Error} if IV or data length is invalid
    */
   static decrypt(
     data: Uint8Array,

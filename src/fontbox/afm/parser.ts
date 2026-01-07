@@ -113,7 +113,7 @@ export interface AFMParserOptions {
  * @param data - The AFM file contents
  * @param options - Parser options
  * @returns The parsed FontMetrics
- * @throws Error if the AFM is malformed
+ * @throws {Error} if the AFM is malformed
  */
 export function parseAFM(data: Uint8Array, options: AFMParserOptions = {}): FontMetrics {
   const parser = new AFMParser(data, options);

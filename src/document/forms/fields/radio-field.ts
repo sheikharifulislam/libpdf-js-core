@@ -99,7 +99,7 @@ export class RadioField extends TerminalField {
    * stream after setting the value.
    *
    * @param option One of getOptions() or null to deselect
-   * @throws Error if field is read-only, option is invalid, or deselection not allowed
+   * @throws {Error} if field is read-only, option is invalid, or deselection not allowed
    */
   async setValue(option: string | null): Promise<void> {
     this.assertWritable();

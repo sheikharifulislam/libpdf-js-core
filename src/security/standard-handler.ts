@@ -163,7 +163,7 @@ export class StandardSecurityHandler {
    *
    * @param credential - The credential to authenticate with
    * @returns Authentication result
-   * @throws UnsupportedEncryptionError if credential type is not supported
+   * @throws {UnsupportedEncryptionError} if credential type is not supported
    */
   authenticateWithCredential(credential: DecryptionCredential): AuthResult {
     if (isPasswordCredential(credential)) {
@@ -407,7 +407,7 @@ export class StandardSecurityHandler {
    * @param objectNumber - Object number containing the string
    * @param generationNumber - Generation number
    * @returns Encrypted string bytes
-   * @throws Error if not authenticated
+   * @throws {Error} if not authenticated
    */
   encryptString(data: Uint8Array, objectNumber: number, generationNumber: number): Uint8Array {
     if (!this.authenticated || !this.handlers) {
@@ -424,7 +424,7 @@ export class StandardSecurityHandler {
    * @param objectNumber - Object number containing the stream
    * @param generationNumber - Generation number
    * @returns Encrypted stream bytes
-   * @throws Error if not authenticated
+   * @throws {Error} if not authenticated
    */
   encryptStream(data: Uint8Array, objectNumber: number, generationNumber: number): Uint8Array {
     if (!this.authenticated || !this.handlers) {
@@ -445,7 +445,7 @@ export class StandardSecurityHandler {
    * @param objectNumber - Object number containing the string
    * @param generationNumber - Generation number
    * @returns Decrypted string bytes
-   * @throws Error if not authenticated
+   * @throws {Error} if not authenticated
    */
   decryptString(data: Uint8Array, objectNumber: number, generationNumber: number): Uint8Array {
     if (!this.authenticated || !this.handlers) {
@@ -462,7 +462,7 @@ export class StandardSecurityHandler {
    * @param objectNumber - Object number containing the stream
    * @param generationNumber - Generation number
    * @returns Decrypted stream bytes
-   * @throws Error if not authenticated
+   * @throws {Error} if not authenticated
    */
   decryptStream(data: Uint8Array, objectNumber: number, generationNumber: number): Uint8Array {
     if (!this.authenticated || !this.handlers) {

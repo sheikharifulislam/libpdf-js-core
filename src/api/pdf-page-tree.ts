@@ -250,7 +250,7 @@ export class PDFPageTree {
    *
    * @param index The page index to remove
    * @returns The removed page reference
-   * @throws RangeError if index is out of bounds
+   * @throws {RangeError} if index is out of bounds
    */
   removePage(index: number): PdfRef {
     if (index < 0 || index >= this.pages.length) {
@@ -287,7 +287,7 @@ export class PDFPageTree {
    *
    * @param fromIndex The current page index
    * @param toIndex The target page index
-   * @throws RangeError if either index is out of bounds
+   * @throws {RangeError} if either index is out of bounds
    */
   movePage(fromIndex: number, toIndex: number): void {
     if (fromIndex < 0 || fromIndex >= this.pages.length) {

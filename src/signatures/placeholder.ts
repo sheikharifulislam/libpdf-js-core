@@ -159,7 +159,7 @@ function findBytesReverse(buffer: Uint8Array, pattern: Uint8Array): number {
  *
  * @param buffer - The PDF buffer to search
  * @returns Placeholder position information
- * @throws Error if placeholders cannot be found
+ * @throws {Error} if placeholders cannot be found
  */
 export function findPlaceholders(buffer: Uint8Array): PlaceholderInfo {
   const encoder = new TextEncoder();
@@ -326,7 +326,7 @@ export function patchByteRange(
  * @param buffer - The PDF buffer to patch (modified in place)
  * @param placeholders - Placeholder position info
  * @param signature - The signature bytes to embed
- * @throws PlaceholderError if signature is too large for placeholder
+ * @throws {PlaceholderError} if signature is too large for placeholder
  */
 export function patchContents(
   buffer: Uint8Array,

@@ -96,7 +96,7 @@ export class HttpTimestampAuthority implements TimestampAuthority {
    * @param digest - The hash to timestamp (typically the signature value)
    * @param algorithm - The digest algorithm used
    * @returns DER-encoded TimeStampToken
-   * @throws TimestampError if the request fails or the response is invalid
+   * @throws {TimestampError} if the request fails or the response is invalid
    */
   async timestamp(digest: Uint8Array, algorithm: DigestAlgorithm): Promise<Uint8Array> {
     // Build the timestamp request

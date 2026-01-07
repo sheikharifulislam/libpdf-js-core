@@ -81,7 +81,7 @@ export class EmbeddedFont extends PdfFont {
    * @param data - TTF, OTF, or Type1 font data
    * @param options - Embedding options
    * @returns EmbeddedFont instance
-   * @throws Error if font format is not recognized
+   * @throws {Error} if font format is not recognized
    */
   static fromBytes(data: Uint8Array, _options?: EmbedFontOptions): EmbeddedFont {
     const program = parseFontProgram(data);

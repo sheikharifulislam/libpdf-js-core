@@ -73,7 +73,7 @@ export class PdfStream extends PdfDict {
    * Results are not cached - call once and store if needed.
    *
    * @returns Decoded data
-   * @throws Error if a filter fails or is unknown
+   * @throws {Error} if a filter fails or is unknown
    */
   async getDecodedData(): Promise<Uint8Array> {
     const filterEntry = this.get("Filter");

@@ -234,7 +234,7 @@ export class NonTerminalField extends FormField {
 
   /**
    * Non-terminal fields don't have values.
-   * @throws Error always - non-terminal fields don't hold values
+   * @throws {Error} always - non-terminal fields don't hold values
    */
   getValue(): never {
     throw new Error(`Non-terminal field "${this.name}" does not have a value`);
@@ -330,7 +330,7 @@ export abstract class TerminalField extends FormField {
    * Use 0 for auto-size (fit to field).
    *
    * @param size Font size in points (0 = auto)
-   * @throws Error if size is negative
+   * @throws {Error} if size is negative
    */
   setFontSize(size: number): void {
     if (size < 0) {
@@ -354,7 +354,7 @@ export abstract class TerminalField extends FormField {
    * @param r Red component (0-1)
    * @param g Green component (0-1)
    * @param b Blue component (0-1)
-   * @throws Error if values are out of range
+   * @throws {Error} if values are out of range
    */
   setTextColor(r: number, g: number, b: number): void {
     if (r < 0 || r > 1 || g < 0 || g > 1 || b < 0 || b > 1) {

@@ -65,7 +65,7 @@ export class FilterPipeline {
    * @param data - Raw stream data
    * @param filters - Single filter spec or array of filter specs
    * @returns Decoded data
-   * @throws Error if a filter is not registered
+   * @throws {Error} if a filter is not registered
    */
   static async decode(data: Uint8Array, filters: FilterSpec | FilterSpec[]): Promise<Uint8Array> {
     const filterList = Array.isArray(filters) ? filters : [filters];
@@ -99,7 +99,7 @@ export class FilterPipeline {
    * @param data - Data to encode
    * @param filters - Single filter spec or array of filter specs
    * @returns Encoded data
-   * @throws Error if a filter is not registered
+   * @throws {Error} if a filter is not registered
    */
   static async encode(data: Uint8Array, filters: FilterSpec | FilterSpec[]): Promise<Uint8Array> {
     const filterList = Array.isArray(filters) ? filters : [filters];

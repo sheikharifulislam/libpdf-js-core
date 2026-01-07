@@ -46,7 +46,7 @@ export abstract class PdfFont {
    *
    * @param text - Unicode text to encode
    * @returns Array of character codes
-   * @throws Error if text contains unencodable characters
+   * @throws {Error} if text contains unencodable characters
    */
   abstract encodeText(text: string): number[];
 

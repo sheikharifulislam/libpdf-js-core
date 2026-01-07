@@ -64,7 +64,7 @@ export class P12Signer implements Signer {
    * @param p12Bytes - The .p12/.pfx file contents
    * @param password - Password to decrypt the file
    * @returns A new P12Signer instance
-   * @throws SignerError if the file is invalid or password is wrong
+   * @throws {SignerError} if the file is invalid or password is wrong
    */
   static async create(p12Bytes: Uint8Array, password: string): Promise<P12Signer> {
     try {

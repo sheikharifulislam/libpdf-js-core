@@ -52,7 +52,7 @@ export function aesEncrypt(key: Uint8Array, plaintext: Uint8Array): Uint8Array {
  * @param key - 16 bytes (AES-128) or 32 bytes (AES-256)
  * @param data - IV (16 bytes) + ciphertext
  * @returns Decrypted plaintext
- * @throws Error if data is too short or padding is invalid
+ * @throws {Error} if data is too short or padding is invalid
  */
 export function aesDecrypt(key: Uint8Array, data: Uint8Array): Uint8Array {
   validateAesKey(key);

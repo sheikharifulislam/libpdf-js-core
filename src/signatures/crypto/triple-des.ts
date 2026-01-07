@@ -273,7 +273,7 @@ export class TripleDES {
    * @param iv - 8-byte initialization vector
    * @param removePadding - Whether to remove PKCS#7 padding (default: true)
    * @returns Decrypted data
-   * @throws Error if key, IV, or data length is invalid
+   * @throws {Error} if key, IV, or data length is invalid
    */
   static decrypt(
     data: Uint8Array,

@@ -287,7 +287,7 @@ function resolveValue(value: unknown, options: EmbeddedParserOptions): unknown {
  *
  * @param data - Raw font data (TTF, OTF, CFF, or PFB)
  * @returns The parsed FontProgram
- * @throws Error if the font format is not recognized
+ * @throws {Error} if the font format is not recognized
  */
 export function parseFontProgram(data: Uint8Array): FontProgram {
   if (data.length < 4) {

@@ -216,7 +216,7 @@ function parseRevision(dict: PdfDict): Revision {
  *
  * @param dict - The /Encrypt dictionary from the PDF trailer
  * @returns Parsed encryption parameters
- * @throws EncryptionDictError if the dictionary is invalid or unsupported
+ * @throws {EncryptionDictError} if the dictionary is invalid or unsupported
  */
 export function parseEncryptionDict(dict: PdfDict): EncryptionDict {
   // Check filter - must be "Standard" (we don't support other handlers)

@@ -115,7 +115,7 @@ export class PDF {
    * Copy pages from another PDF into this one.
    * Pages are deep-copied with all resources.
    * @returns Refs to the copied pages (not yet inserted)
-   * @throws Error if any page fails to copy (fail-fast, no partial results)
+   * @throws {Error} if any page fails to copy (fail-fast, no partial results)
    */
   copyPagesFrom(source: PDF, indices: number[], options?: CopyPagesOptions): PdfRef[];
 }

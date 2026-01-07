@@ -92,7 +92,7 @@ export class TextField extends TerminalField {
    * stream after setting the value.
    *
    * @param value The new text value
-   * @throws Error if field is read-only
+   * @throws {Error} if field is read-only
    */
   async setValue(value: string): Promise<void> {
     this.assertWritable();

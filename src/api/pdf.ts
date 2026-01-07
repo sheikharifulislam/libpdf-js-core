@@ -189,6 +189,12 @@ export class PDF {
 
   /**
    * Load a PDF from bytes.
+   *
+   * @param bytes - The PDF file bytes
+   * @param options - Load options (credentials, lenient mode)
+   * @returns The loaded PDF document
+   * @throws {Error} If the document has no catalog (missing /Root in trailer)
+   * @throws {Error} If parsing fails and lenient mode is disabled
    */
   static async load(bytes: Uint8Array, options?: LoadOptions): Promise<PDF> {
     const scanner = new Scanner(bytes);
@@ -276,6 +282,7 @@ export class PDF {
    * continued use of the PDF instance after operations like signing.
    *
    * @param bytes - The new PDF bytes to reload from
+   * @throws {Error} If the document has no catalog
    */
   async reload(bytes: Uint8Array): Promise<void> {
     const scanner = new Scanner(bytes);
@@ -533,8 +540,9 @@ export class PDF {
   /**
    * Add a new blank page.
    *
-   * @param options Page size, rotation, and insertion position
+   * @param options - Page size, rotation, and insertion position
    * @returns The new page
+   * @throws {RangeError} If insertAt index is out of bounds
    */
   addPage(options: AddPageOptions = {}): PDFPage {
     const { width, height } = resolvePageSize(options);
@@ -569,9 +577,11 @@ export class PDF {
   /**
    * Insert an existing page at the given index.
    *
-   * @param index Position to insert (0 = first, negative = append)
-   * @param page The page dict or ref to insert
+   * @param index - Position to insert (0 = first, negative = append)
+   * @param page - The page dict or ref to insert
    * @returns The page reference
+   * @throws {Error} If page reference does not point to a dictionary
+   * @throws {RangeError} If index is out of bounds
    */
   insertPage(index: number, page: PdfDict | PdfRef): PdfRef {
     let pageRef: PdfRef;
@@ -601,9 +611,9 @@ export class PDF {
   /**
    * Remove the page at the given index.
    *
-   * @param index The page index to remove
+   * @param index - The page index to remove
    * @returns The removed page reference
-   * @throws RangeError if index is out of bounds
+   * @throws {RangeError} If index is out of bounds
    */
   removePage(index: number): PdfRef {
     return this.ctx.pages.removePage(index);
@@ -612,9 +622,9 @@ export class PDF {
   /**
    * Move a page from one position to another.
    *
-   * @param fromIndex The current page index
-   * @param toIndex The target page index
-   * @throws RangeError if either index is out of bounds
+   * @param fromIndex - The current page index
+   * @param toIndex - The target page index
+   * @throws {RangeError} If either index is out of bounds
    */
   movePage(fromIndex: number, toIndex: number): void {
     this.ctx.pages.movePage(fromIndex, toIndex);
@@ -629,11 +639,12 @@ export class PDF {
    *
    * Works with same-document copying for page duplication.
    *
-   * @param source The source PDF document
-   * @param indices Array of page indices to copy (0-based)
-   * @param options Copy options including insertion position
+   * @param source - The source PDF document
+   * @param indices - Array of page indices to copy (0-based)
+   * @param options - Copy options including insertion position
    * @returns Array of PDFPage objects for the copied pages
-   * @throws RangeError if any source page index is out of bounds
+   * @throws {RangeError} If any source page index is out of bounds
+   * @throws {Error} If source page not found or copied page is not a dictionary
    *
    * @example
    * ```typescript
@@ -711,10 +722,10 @@ export class PDF {
    * Creates a new document containing only the specified pages, copied from
    * this document. The original document is not modified.
    *
-   * @param indices Array of page indices to extract (0-based)
-   * @param options Extraction options
+   * @param indices - Array of page indices to extract (0-based)
+   * @param options - Extraction options
    * @returns A new PDF containing only the extracted pages
-   * @throws RangeError if any page index is out of bounds
+   * @throws {RangeError} If any page index is out of bounds
    *
    * @example
    * ```typescript
@@ -758,9 +769,10 @@ export class PDF {
    * `page.drawPage()`. This is useful for watermarks, letterheads,
    * backgrounds, and page overlays.
    *
-   * @param source The source PDF document
-   * @param pageIndex The page index to embed (0-based)
+   * @param source - The source PDF document
+   * @param pageIndex - The page index to embed (0-based)
    * @returns A PDFEmbeddedPage that can be drawn with page.drawPage()
+   * @throws {RangeError} If page index is out of bounds
    *
    * @example
    * ```typescript
@@ -984,6 +996,7 @@ export class PDF {
    * @param data - Font data (TTF, OTF, or Type1)
    * @param options - Embedding options
    * @returns EmbeddedFont instance for encoding text
+   * @throws {Error} If font data is invalid or unsupported format
    */
   embedFont(data: Uint8Array, options?: EmbedFontOptions): EmbeddedFont {
     return this.fonts.embed(data, options);
@@ -1073,10 +1086,10 @@ export class PDF {
    *
    * Convenience method that delegates to `pdf.attachments.add()`.
    *
-   * @param name The attachment name (key in the EmbeddedFiles tree)
-   * @param data The file data
-   * @param options Attachment options (description, MIME type, dates)
-   * @throws Error if name already exists and overwrite !== true
+   * @param name - The attachment name (key in the EmbeddedFiles tree)
+   * @param data - The file data
+   * @param options - Attachment options (description, MIME type, dates)
+   * @throws {Error} If name already exists and overwrite !== true
    */
   async addAttachment(
     name: string,
@@ -1103,10 +1116,33 @@ export class PDF {
   // ─────────────────────────────────────────────────────────────────────────────
 
   /**
+   * Check if the document has an interactive form (AcroForm).
+   *
+   * This is a synchronous check that examines the catalog for an AcroForm entry.
+   * Use this for quick checks before calling `getForm()`.
+   *
+   * @returns true if the document has an AcroForm dictionary
+   *
+   * @example
+   * ```typescript
+   * if (pdf.hasForm()) {
+   *   const form = await pdf.getForm();
+   *   // Work with form...
+   * }
+   * ```
+   */
+  hasForm(): boolean {
+    const catalog = this.ctx.catalog.getDict();
+    return catalog.has("AcroForm");
+  }
+
+  /**
    * Get the document's interactive form.
    *
    * Returns null if no form exists. The form is loaded lazily on first call
    * and cached for subsequent calls.
+   *
+   * @returns The form, or null if no form exists
    *
    * @example
    * ```typescript
@@ -1226,8 +1262,9 @@ export class PDF {
    * After signing, this PDF instance is automatically reloaded with the signed
    * bytes. You can continue using it or call save() to get the final bytes.
    *
-   * @param options Signing options including signer, reason, location, etc.
+   * @param options - Signing options including signer, reason, location, etc.
    * @returns The signed PDF bytes and any warnings
+   * @throws {Error} If signing fails (invalid certificate, signature creation error)
    *
    * @example
    * ```typescript
@@ -1365,6 +1402,7 @@ export class PDF {
    *
    * @param options - Save options
    * @returns The saved PDF bytes
+   * @throws {Error} If document has no catalog (missing /Root in trailer)
    */
   async save(options: SaveOptions = {}): Promise<Uint8Array> {
     const result = await this.saveInternal(options);

@@ -41,7 +41,7 @@ export class RC4Cipher {
    * Create a new RC4 cipher with the given key.
    *
    * @param key - Encryption key (1-256 bytes, typically 5-16 for PDF)
-   * @throws Error if key is empty or too long
+   * @throws {Error} if key is empty or too long
    */
   constructor(key: Uint8Array) {
     if (key.length === 0) {

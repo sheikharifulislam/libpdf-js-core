@@ -134,7 +134,7 @@ export class DropdownField extends TerminalField {
    * stream after setting the value.
    *
    * @param value The value to select
-   * @throws Error if field is read-only or value is invalid (for non-editable dropdowns)
+   * @throws {Error} if field is read-only or value is invalid (for non-editable dropdowns)
    */
   async setValue(value: string): Promise<void> {
     this.assertWritable();
@@ -267,7 +267,7 @@ export class ListBoxField extends TerminalField {
    * stream after setting the value.
    *
    * @param values Array of values to select
-   * @throws Error if field is read-only, multiple selection not allowed, or values are invalid
+   * @throws {Error} if field is read-only, multiple selection not allowed, or values are invalid
    */
   async setValue(values: string[]): Promise<void> {
     this.assertWritable();

@@ -195,7 +195,7 @@ async hasAttachment(name: string): Promise<boolean>;
 
 /**
  * Add a file attachment to the document.
- * @throws Error if name already exists and overwrite !== true
+ * @throws {Error} if name already exists and overwrite !== true
  */
 async addAttachment(
   name: string,

@@ -55,17 +55,36 @@ export interface Rectangle {
 
 /**
  * Options for drawing an embedded page.
+ *
+ * **Scale vs Width/Height Priority:**
+ * - If `width` is specified, it takes precedence over `scale` for horizontal sizing
+ * - If `height` is specified, it takes precedence over `scale` for vertical sizing
+ * - If only `width` is specified, `height` is calculated to maintain aspect ratio
+ * - If only `height` is specified, `width` is calculated to maintain aspect ratio
+ * - If both `width` and `height` are specified, aspect ratio may not be preserved
+ * - If neither `width` nor `height` is specified, `scale` is used (default: 1.0)
  */
 export interface DrawPageOptions {
   /** X position from left edge (default: 0) */
   x?: number;
   /** Y position from bottom edge (default: 0) */
   y?: number;
-  /** Uniform scale factor (default: 1.0) */
+  /**
+   * Uniform scale factor (default: 1.0).
+   * Ignored if `width` or `height` is specified.
+   */
   scale?: number;
-  /** Target width in points (overrides scale) */
+  /**
+   * Target width in points.
+   * Takes precedence over `scale`. If specified without `height`,
+   * the aspect ratio is preserved.
+   */
   width?: number;
-  /** Target height in points (overrides scale) */
+  /**
+   * Target height in points.
+   * Takes precedence over `scale`. If specified without `width`,
+   * the aspect ratio is preserved.
+   */
   height?: number;
   /** Opacity 0-1 (default: 1.0, fully opaque) */
   opacity?: number;
@@ -197,6 +216,26 @@ export class PDFPage {
   }
 
   /**
+   * Whether the page is in landscape orientation.
+   *
+   * A page is landscape when its width is greater than its height.
+   * This accounts for page rotation.
+   */
+  get isLandscape(): boolean {
+    return this.width > this.height;
+  }
+
+  /**
+   * Whether the page is in portrait orientation.
+   *
+   * A page is portrait when its height is greater than or equal to its width.
+   * This accounts for page rotation.
+   */
+  get isPortrait(): boolean {
+    return this.height >= this.width;
+  }
+
+  /**
    * Page rotation in degrees (0, 90, 180, or 270).
    */
   get rotation(): 0 | 90 | 180 | 270 {
@@ -225,7 +264,7 @@ export class PDFPage {
   /**
    * Set the page rotation.
    *
-   * @param degrees - Rotation in degrees (0, 90, 180, or 270)
+   * @param degrees - Rotation in degrees (must be 0, 90, 180, or 270)
    */
   setRotation(degrees: 0 | 90 | 180 | 270): void {
     if (degrees === 0) {
@@ -267,8 +306,8 @@ export class PDFPage {
    * By default, it's drawn in the foreground (on top of existing content).
    * Use `{ background: true }` to draw behind existing content.
    *
-   * @param embedded The embedded page to draw
-   * @param options Drawing options (position, scale, opacity, background)
+   * @param embedded - The embedded page to draw
+   * @param options - Drawing options (position, scale, opacity, background)
    *
    * @example
    * ```typescript
@@ -355,9 +394,13 @@ export class PDFPage {
    * For radio groups, the `option` parameter is required and specifies which
    * radio option this widget represents.
    *
-   * @param field The form field to draw
-   * @param options Position, size, and option settings
-   * @throws Error if field is a radio group and option is not specified
+   * @param field - The form field to draw
+   * @param options - Position, size, and option settings
+   * @throws {Error} If page has no context (not attached to a document)
+   * @throws {Error} If field is not a terminal field
+   * @throws {Error} If field is a signature field (use form.createSignatureField)
+   * @throws {Error} If field is a radio group and option is not specified
+   * @throws {Error} If radio option is invalid for the field
    *
    * @example
    * ```typescript

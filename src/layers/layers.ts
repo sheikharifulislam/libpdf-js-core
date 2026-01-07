@@ -295,7 +295,7 @@ export async function getLayers(ctx: PDFContext): Promise<LayerInfo[]> {
 /**
  * Validate OCG structure before removal.
  *
- * @throws Error if structure is malformed
+ * @throws {Error} if structure is malformed
  */
 export async function validateOCGStructure(ctx: PDFContext): Promise<void> {
   const catalog = ctx.catalog.getDict();

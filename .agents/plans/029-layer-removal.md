@@ -448,7 +448,7 @@ async getLayers(): Promise<LayerInfo[]>
  * 
  * @param options.deep - If true, also clean content streams (future)
  * @returns Promise<RemoveLayersResult> - removal statistics
- * @throws Error if OCG structure is malformed
+ * @throws {Error} if OCG structure is malformed
  */
 async removeLayers(options?: RemoveLayersOptions): Promise<RemoveLayersResult>
 ```

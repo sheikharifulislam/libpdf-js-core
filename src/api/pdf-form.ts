@@ -238,6 +238,7 @@ export class PDFForm {
   private constructor(acroForm: AcroForm, ctx: PDFContext, fields: FormField[]) {
     this._acroForm = acroForm;
     this._ctx = ctx;
+
     this.allFields = fields;
     this.fieldsByName = new Map(fields.map(f => [f.name, f]));
   }
@@ -426,9 +427,10 @@ export class PDFForm {
    * The field is created with an empty /Kids array. Widget properties
    * (page, rect, etc.) are set by PDFSignature during signing.
    *
-   * @param name Field name (must be unique)
-   * @param options Signature field options
+   * @param name - Field name (must be unique)
+   * @param options - Signature field options
    * @returns The created signature field
+   * @throws {Error} If a field with the same name already exists
    *
    * @example
    * ```typescript
@@ -477,9 +479,10 @@ export class PDFForm {
    * Creates a text field with an empty /Kids array. Use `page.drawField()` to
    * add widgets that place the field on pages.
    *
-   * @param name Field name (must be unique)
-   * @param options Text field options
+   * @param name - Field name (must be unique)
+   * @param options - Text field options
    * @returns The created text field
+   * @throws {Error} If a field with the same name already exists
    *
    * @example
    * ```typescript
@@ -586,9 +589,10 @@ export class PDFForm {
   /**
    * Create a new checkbox field.
    *
-   * @param name Field name (must be unique)
-   * @param options Checkbox options
+   * @param name - Field name (must be unique)
+   * @param options - Checkbox options
    * @returns The created checkbox field
+   * @throws {Error} If a field with the same name already exists
    *
    * @example
    * ```typescript
@@ -655,9 +659,11 @@ export class PDFForm {
    * Radio groups must have at least one option. Each option gets its own widget
    * when you call `page.drawField()` with the `option` parameter.
    *
-   * @param name Field name (must be unique)
-   * @param options Radio group options (options array is required)
+   * @param name - Field name (must be unique)
+   * @param options - Radio group options (options array is required)
    * @returns The created radio field
+   * @throws {Error} If a field with the same name already exists
+   * @throws {Error} If options array is empty or missing
    *
    * @example
    * ```typescript
@@ -733,9 +739,11 @@ export class PDFForm {
   /**
    * Create a new dropdown (combo box) field.
    *
-   * @param name Field name (must be unique)
-   * @param options Dropdown options (options array is required)
+   * @param name - Field name (must be unique)
+   * @param options - Dropdown options (options array is required)
    * @returns The created dropdown field
+   * @throws {Error} If a field with the same name already exists
+   * @throws {Error} If options array is empty or missing
    *
    * @example
    * ```typescript
@@ -828,9 +836,11 @@ export class PDFForm {
   /**
    * Create a new list box field.
    *
-   * @param name Field name (must be unique)
-   * @param options Listbox options (options array is required)
+   * @param name - Field name (must be unique)
+   * @param options - Listbox options (options array is required)
    * @returns The created listbox field
+   * @throws {Error} If a field with the same name already exists
+   * @throws {Error} If options array is empty or missing
    *
    * @example
    * ```typescript
@@ -1041,8 +1051,9 @@ export class PDFForm {
    * This method is **lenient**: fields that don't exist are silently ignored.
    * Type mismatches will still throw errors.
    *
-   * @param values Object mapping field names to values
+   * @param values - Object mapping field names to values
    * @returns Object with `filled` (successful) and `skipped` (missing) field names
+   * @throws {TypeError} If a value type doesn't match the field type
    *
    * @example
    * ```typescript
@@ -1119,6 +1130,20 @@ export class PDFForm {
     return this.allFields.length;
   }
 
+  /**
+   * Whether the form has no fields.
+   *
+   * @example
+   * ```typescript
+   * if (form.isEmpty) {
+   *   console.log("Form has no fields");
+   * }
+   * ```
+   */
+  get isEmpty(): boolean {
+    return this.allFields.length === 0;
+  }
+
   // ─────────────────────────────────────────────────────────────────────────────
   // Async Operations
   // ─────────────────────────────────────────────────────────────────────────────
@@ -1156,7 +1181,7 @@ export class PDFForm {
    *
    * **Warning**: This operation is irreversible. The form can no longer be edited.
    *
-   * @param options Flattening options
+   * @param options - Flattening options
    *
    * @example
    * ```typescript
