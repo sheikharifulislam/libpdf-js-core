@@ -168,6 +168,44 @@ describe("flattenLayers", () => {
   });
 });
 
+describe("malformed OCG handling", () => {
+  it("flattenLayers succeeds when OCProperties.OCGs is not an array", async () => {
+    const bytes = await loadFixture("layers", "single-layer-on.pdf");
+    const pdf = await PDF.load(bytes);
+
+    // Corrupt OCProperties.OCGs to be a number instead of array
+    const catalog = await pdf.getCatalog();
+    const ocProperties = catalog?.get("OCProperties");
+    if (ocProperties && "set" in ocProperties) {
+      (ocProperties as any).set("OCGs", 42); // Invalid: should be array
+    }
+
+    // flattenLayers should still work - just remove OCProperties
+    const result = await flattenLayers(pdf.context);
+
+    expect(result.flattened).toBe(true);
+    expect(await hasLayers(pdf.context)).toBe(false);
+  });
+
+  it("flattenLayers succeeds when OCProperties.D is not a dictionary", async () => {
+    const bytes = await loadFixture("layers", "single-layer-on.pdf");
+    const pdf = await PDF.load(bytes);
+
+    // Corrupt OCProperties.D to be a string instead of dictionary
+    const catalog = await pdf.getCatalog();
+    const ocProperties = catalog?.get("OCProperties");
+    if (ocProperties && "set" in ocProperties) {
+      (ocProperties as any).set("D", "invalid"); // Invalid: should be dict
+    }
+
+    // flattenLayers should still work - just remove OCProperties
+    const result = await flattenLayers(pdf.context);
+
+    expect(result.flattened).toBe(true);
+    expect(await hasLayers(pdf.context)).toBe(false);
+  });
+});
+
 describe("round-trip", () => {
   it("saved PDF without layers opens correctly", async () => {
     const bytes = await loadFixture("layers", "single-layer-on.pdf");

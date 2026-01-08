@@ -381,21 +381,12 @@ export async function flattenLayers(ctx: PDFContext): Promise<FlattenLayersResul
     return { flattened: false, layerCount: 0 };
   }
 
-  // Count layers before flattening
+  // Count layers before flattening (getLayers is lenient, returns [] for malformed)
   const layers = await getLayers(ctx);
   const layerCount = layers.length;
 
-  if (layerCount === 0) {
-    // OCProperties exists but no valid OCGs - still remove it
-    catalog.delete("OCProperties");
-
-    return { flattened: true, layerCount: 0 };
-  }
-
-  // Validate structure before flattening
-  await validateOCGStructure(ctx);
-
-  // Remove OCProperties (flattens all layers)
+  // Remove OCProperties regardless of structure validity.
+  // The goal is to flatten, so removing a malformed structure is still correct.
   catalog.delete("OCProperties");
 
   return {
