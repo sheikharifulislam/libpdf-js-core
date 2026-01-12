@@ -2,6 +2,27 @@
   "name": "@libpdf/core",
   "version": "0.0.1-beta.0",
   "description": "A modern PDF library for TypeScript - parsing and generation",
+  "author": "Lucas Smith",
+  "license": "MIT",
+  "homepage": "https://libpdf.documenso.com",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/libpdf-js/core.git"
+  },
+  "bugs": {
+    "url": "https://github.com/libpdf-js/core/issues"
+  },
+  "keywords": [
+    "pdf",
+    "typescript",
+    "parser",
+    "generator",
+    "pkcs7",
+    "esign",
+    "digital-signature",
+    "signing",
+    "document"
+  ],
   "type": "module",
   "sideEffects": false,
   "exports": {
@@ -17,7 +38,7 @@
   "types": "./dist/index.d.mts",
   "files": [
     "dist",
-    "LICENSE",
+    "LICENSE.md",
     "README.md"
   ],
   "imports": {
