@@ -7,10 +7,9 @@
  * RFC 5280: Section 4.2.2.1 - Authority Information Access
  */
 
-import { fromBER, ObjectIdentifier, Sequence } from "asn1js";
+import { fromBER } from "asn1js";
 import * as pkijs from "pkijs";
-import { bytesToHex } from "#src/helpers/strings.ts";
-import { toArrayBuffer } from "../helpers/buffer";
+import { bytesToHex, toArrayBuffer } from "#src/helpers/buffer.ts";
 import { OID_AD_CA_ISSUERS, OID_AUTHORITY_INFO_ACCESS } from "./oids";
 import { CertificateChainError } from "./types";
 
@@ -67,12 +66,14 @@ export async function buildCertificateChain(
   const chain: Uint8Array[] = [...(options.existingChain ?? [])];
   const seenSerials = new Set<string>();
 
-  // Add existing certificates to seen set
+  // Add existing certificates to seen set and find the last one
+  let lastCertInChain: pkijs.Certificate | null = null;
   for (const certDer of chain) {
     try {
       const cert = parseCertificate(certDer);
 
       seenSerials.add(getSerialKey(cert));
+      lastCertInChain = cert;
     } catch (error) {
       console.warn(`Could not parse existing certificate, will ignore it`);
       console.warn(error);
@@ -82,8 +83,17 @@ export async function buildCertificateChain(
   }
 
   // Start with the signing certificate
-  let currentCert = parseCertificate(certificate);
-  seenSerials.add(getSerialKey(currentCert));
+  const signingCert = parseCertificate(certificate);
+  seenSerials.add(getSerialKey(signingCert));
+
+  // Determine where to start building the chain:
+  // If we have an existing chain ending with a non-self-signed cert,
+  // start from that cert to continue building up to the root.
+  // Otherwise, start from the signing certificate.
+  let currentCert = signingCert;
+  if (lastCertInChain && !isSelfSigned(lastCertInChain)) {
+    currentCert = lastCertInChain;
+  }
 
   // Build chain by following AIA CA Issuers links
   while (chain.length < maxChainLength) {
@@ -186,6 +196,8 @@ function isSelfSigned(cert: pkijs.Certificate): boolean {
 
 /**
  * Get CA Issuers URL from certificate's AIA extension.
+ *
+ * Uses pkijs.InfoAccess for parsing.
  */
 function getCaIssuersUrl(cert: pkijs.Certificate): string | null {
   const aiaExtension = cert.extensions?.find(ext => ext.extnID === OID_AUTHORITY_INFO_ACCESS);
@@ -195,7 +207,6 @@ function getCaIssuersUrl(cert: pkijs.Certificate): string | null {
   }
 
   try {
-    // Parse AIA extension value
     const aiaAsn1 = fromBER(
       toArrayBuffer(new Uint8Array(aiaExtension.extnValue.valueBlock.valueHexView)),
     );
@@ -204,40 +215,20 @@ function getCaIssuersUrl(cert: pkijs.Certificate): string | null {
       return null;
     }
 
-    // AIA is a SEQUENCE OF AccessDescription
-    const aiaSeq = aiaAsn1.result as Sequence;
+    const infoAccess = new pkijs.InfoAccess({ schema: aiaAsn1.result });
 
-    if (!(aiaSeq instanceof Sequence)) {
-      return null;
-    }
-
-    for (const item of aiaSeq.valueBlock.value) {
-      if (!(item instanceof Sequence) || item.valueBlock.value.length < 2) {
-        continue;
-      }
-
-      const accessMethod = item.valueBlock.value[0];
-      const accessLocation = item.valueBlock.value[1];
-
-      // Check if this is CA Issuers
-      if (
-        accessMethod instanceof ObjectIdentifier &&
-        accessMethod.valueBlock.toString() === OID_AD_CA_ISSUERS
-      ) {
-        // accessLocation is a GeneralName - check for URI (tag 6)
-        if (accessLocation.idBlock?.tagNumber === 6) {
-          const urlBytes = (accessLocation as any).valueBlock?.valueHexView;
-
-          if (urlBytes) {
-            return new TextDecoder().decode(urlBytes);
-          }
+    for (const desc of infoAccess.accessDescriptions) {
+      // CA Issuers OID: 1.3.6.1.5.5.7.48.2
+      if (desc.accessMethod === OID_AD_CA_ISSUERS) {
+        const location = desc.accessLocation as { type?: number; value?: string };
+        // type 6 = uniformResourceIdentifier
+        if (location.type === 6 && location.value) {
+          return location.value;
         }
       }
     }
   } catch (error) {
-    console.warn(`Could not get CA Issuers URL from certificate`);
-    console.warn(error);
-
+    console.warn(`Could not parse AIA extension:`, error);
     return null;
   }
 

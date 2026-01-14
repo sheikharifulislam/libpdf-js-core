@@ -15,7 +15,7 @@ import {
   OID_AD_OCSP,
   OID_AUTHORITY_INFO_ACCESS,
   OID_CRL_DISTRIBUTION_POINTS,
-  OID_SHA256,
+  OID_SHA1,
 } from "./oids";
 import type { RevocationProvider } from "./types";
 import { RevocationError } from "./types";
@@ -153,6 +153,8 @@ export class DefaultRevocationProvider implements RevocationProvider {
 
   /**
    * Get OCSP responder URL from certificate's Authority Information Access extension.
+   *
+   * Uses pkijs.InfoAccess for parsing.
    */
   private getOcspUrl(cert: pkijs.Certificate): string | null {
     const aiaExtension = cert.extensions?.find(ext => ext.extnID === OID_AUTHORITY_INFO_ACCESS);
@@ -162,7 +164,6 @@ export class DefaultRevocationProvider implements RevocationProvider {
     }
 
     try {
-      // Parse AIA extension value
       const aiaAsn1 = fromBER(
         toArrayBuffer(new Uint8Array(aiaExtension.extnValue.valueBlock.valueHexView)),
       );
@@ -171,41 +172,20 @@ export class DefaultRevocationProvider implements RevocationProvider {
         return null;
       }
 
-      // AIA is a SEQUENCE OF AccessDescription
-      // AccessDescription ::= SEQUENCE { accessMethod OID, accessLocation GeneralName }
-      const aiaSeq = aiaAsn1.result as Sequence;
+      const infoAccess = new pkijs.InfoAccess({ schema: aiaAsn1.result });
 
-      if (!(aiaSeq instanceof Sequence)) {
-        return null;
-      }
-
-      for (const item of aiaSeq.valueBlock.value) {
-        if (!(item instanceof Sequence) || item.valueBlock.value.length < 2) {
-          continue;
-        }
-
-        const accessMethod = item.valueBlock.value[0];
-        const accessLocation = item.valueBlock.value[1];
-
-        // Check if this is OCSP
-        if (
-          accessMethod instanceof ObjectIdentifier &&
-          accessMethod.valueBlock.toString() === OID_AD_OCSP
-        ) {
-          // accessLocation is a GeneralName - check for URI (tag 6)
-          if (accessLocation.idBlock?.tagNumber === 6) {
-            // Extract URL from the IA5String value
-            const urlBytes = (accessLocation as any).valueBlock?.valueHexView;
-
-            if (urlBytes) {
-              return new TextDecoder().decode(urlBytes);
-            }
+      for (const desc of infoAccess.accessDescriptions) {
+        // OCSP OID: 1.3.6.1.5.5.7.48.1
+        if (desc.accessMethod === OID_AD_OCSP) {
+          const location = desc.accessLocation as { type?: number; value?: string };
+          // type 6 = uniformResourceIdentifier
+          if (location.type === 6 && location.value) {
+            return location.value;
           }
         }
       }
     } catch (error) {
-      console.warn(error);
-
+      console.warn(`Could not parse AIA extension:`, error);
       return null;
     }
 
@@ -214,6 +194,8 @@ export class DefaultRevocationProvider implements RevocationProvider {
 
   /**
    * Get CRL distribution point URLs from certificate.
+   *
+   * Uses pkijs.CRLDistributionPoints for parsing.
    */
   private getCrlUrls(cert: pkijs.Certificate): string[] {
     const urls: string[] = [];
@@ -225,8 +207,9 @@ export class DefaultRevocationProvider implements RevocationProvider {
     }
 
     try {
-      // Parse CRL Distribution Points
-      const crlAsn1 = fromBER(toArrayBuffer(crlExtension.extnValue.valueBlock.valueHexView));
+      const crlAsn1 = fromBER(
+        toArrayBuffer(new Uint8Array(crlExtension.extnValue.valueBlock.valueHexView)),
+      );
 
       if (crlAsn1.offset === -1) {
         return urls;
@@ -235,24 +218,20 @@ export class DefaultRevocationProvider implements RevocationProvider {
       const crlDPs = new pkijs.CRLDistributionPoints({ schema: crlAsn1.result });
 
       for (const dp of crlDPs.distributionPoints) {
-        if (dp.distributionPoint) {
-          // distributionPoint can be fullName or nameRelativeToCRLIssuer
-          const fullName = (dp.distributionPoint as any).fullName;
-
-          if (fullName && Array.isArray(fullName)) {
-            for (const name of fullName) {
-              if (name.type === 6) {
-                // uniformResourceIdentifier
-                urls.push(name.value);
-              }
+        // distributionPoint is an array of GeneralName objects
+        const names = dp.distributionPoint;
+        if (Array.isArray(names)) {
+          for (const name of names) {
+            const gn = name as { type?: number; value?: string };
+            // type 6 = uniformResourceIdentifier
+            if (gn.type === 6 && gn.value) {
+              urls.push(gn.value);
             }
           }
         }
       }
     } catch (error) {
-      console.warn(error);
-
-      // Ignore parsing errors
+      console.warn(`Could not parse CRL distribution points:`, error);
     }
 
     return urls;
@@ -267,15 +246,18 @@ export class DefaultRevocationProvider implements RevocationProvider {
   ): Promise<Uint8Array> {
     const crypto = pkijs.getCrypto(true);
 
-    // Hash the issuer's name
+    // Use SHA-1 for OCSP certID hashes.
+    // While SHA-1 is deprecated for signatures, it's widely required for OCSP
+    // because many responders (including DigiCert) only support SHA-1 for certID.
+    // This is acceptable since the hash is for identification, not security.
     const issuerNameHash = await crypto.digest(
-      { name: "SHA-256" },
+      { name: "SHA-1" },
       issuer.subject.toSchema().toBER(false),
     );
 
     // Hash the issuer's public key
     const issuerKeyHash = await crypto.digest(
-      { name: "SHA-256" },
+      { name: "SHA-1" },
       toArrayBuffer(
         new Uint8Array(issuer.subjectPublicKeyInfo.subjectPublicKey.valueBlock.valueHexView),
       ),
@@ -286,7 +268,7 @@ export class DefaultRevocationProvider implements RevocationProvider {
       value: [
         // hashAlgorithm
         new Sequence({
-          value: [new ObjectIdentifier({ value: OID_SHA256 })],
+          value: [new ObjectIdentifier({ value: OID_SHA1 })],
         }),
         // issuerNameHash
         new OctetString({ valueHex: issuerNameHash }),
@@ -344,12 +326,57 @@ export class DefaultRevocationProvider implements RevocationProvider {
       }
 
       const data = await response.arrayBuffer();
+      const ocspResponse = new Uint8Array(data);
 
-      return new Uint8Array(data);
+      // Validate OCSP response status
+      // OCSPResponse ::= SEQUENCE { responseStatus OCSPResponseStatus, ... }
+      // OCSPResponseStatus: 0=successful, 1=malformed, 2=internalError, 3=tryLater, 5=sigRequired, 6=unauthorized
+      if (!this.isOcspResponseSuccessful(ocspResponse)) {
+        throw new RevocationError(`OCSP response status is not successful`);
+      }
+
+      return ocspResponse;
     } catch (error) {
       clearTimeout(timeoutId);
 
       throw error;
+    }
+  }
+
+  /**
+   * Check if OCSP response has successful status.
+   *
+   * Per RFC 6960, OCSPResponse starts with responseStatus ENUMERATED.
+   * Only status 0 (successful) means the response contains actual revocation data.
+   */
+  private isOcspResponseSuccessful(response: Uint8Array): boolean {
+    try {
+      // Parse OCSP response to check status
+      // OCSPResponse ::= SEQUENCE { responseStatus ENUMERATED, responseBytes [0] OPTIONAL }
+      const asn1 = fromBER(toArrayBuffer(response));
+      if (asn1.offset === -1) {
+        return false;
+      }
+
+      const seq = asn1.result as Sequence;
+      if (!(seq instanceof Sequence) || seq.valueBlock.value.length < 1) {
+        return false;
+      }
+
+      // First element is responseStatus (ENUMERATED)
+      const statusElement = seq.valueBlock.value[0];
+      if (statusElement.idBlock.tagNumber !== 10) {
+        // Not ENUMERATED
+        return false;
+      }
+
+      // Get the status value
+      const statusValue = (statusElement as any).valueBlock?.valueDec ?? -1;
+
+      // Only status 0 (successful) is valid
+      return statusValue === 0;
+    } catch {
+      return false;
     }
   }
 
@@ -384,4 +411,54 @@ export class DefaultRevocationProvider implements RevocationProvider {
       return null;
     }
   }
+}
+
+/**
+ * Extract certificates from an OCSP response.
+ *
+ * OCSP responses can contain the responder's certificate (and its chain)
+ * in the BasicOCSPResponse.certs field. These certificates are needed
+ * for LTV to verify the OCSP response signature.
+ *
+ * @param ocspResponse - DER-encoded OCSP response
+ * @returns Array of DER-encoded certificates found in the response
+ */
+export function extractOcspResponderCerts(ocspResponse: Uint8Array): Uint8Array[] {
+  const certs: Uint8Array[] = [];
+
+  try {
+    const asn1 = fromBER(toArrayBuffer(ocspResponse));
+    if (asn1.offset === -1) {
+      return certs;
+    }
+
+    const ocspResp = new pkijs.OCSPResponse({ schema: asn1.result });
+
+    // Check if response has responseBytes
+    if (!ocspResp.responseBytes) {
+      return certs;
+    }
+
+    // Parse the BasicOCSPResponse from responseBytes.response
+    const basicAsn1 = fromBER(
+      toArrayBuffer(new Uint8Array(ocspResp.responseBytes.response.valueBlock.valueHexView)),
+    );
+    if (basicAsn1.offset === -1) {
+      return certs;
+    }
+
+    const basicResp = new pkijs.BasicOCSPResponse({ schema: basicAsn1.result });
+
+    // Extract certificates from the certs field
+    if (basicResp.certs && basicResp.certs.length > 0) {
+      for (const cert of basicResp.certs) {
+        const certDer = new Uint8Array(cert.toSchema().toBER(false));
+        certs.push(certDer);
+      }
+    }
+  } catch {
+    // Ignore parsing errors
+  }
+
+  return certs;
 }

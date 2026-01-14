@@ -274,6 +274,13 @@ export interface LtvValidationData {
 
   /** Timestamp when validation data was gathered */
   timestamp: Date;
+
+  /**
+   * Embedded timestamp tokens (for VRI entries).
+   * Each timestamp token embedded in the signature's unsigned attributes
+   * needs its own VRI entry per ETSI EN 319 142-2.
+   */
+  embeddedTimestamps?: Uint8Array[];
 }
 
 /**

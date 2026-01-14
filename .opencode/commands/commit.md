@@ -5,6 +5,10 @@ allowed-tools: Bash, Read, Glob, Grep
 
 Create a git commit for the current changes using the Conventional Commits standard.
 
+## Context
+
+$ARGUMENTS
+
 ## Process
 
 1. **Analyze the changes** by running:

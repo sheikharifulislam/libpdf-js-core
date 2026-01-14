@@ -9,18 +9,23 @@
  * ETSI EN 319 142-1: PAdES digital signatures
  */
 
-import { fromBER, ObjectIdentifier, OctetString, UTCTime } from "asn1js";
+import { fromBER, ObjectIdentifier, OctetString, Sequence, UTCTime } from "asn1js";
 import * as pkijs from "pkijs";
 import { toArrayBuffer } from "../../helpers/buffer";
 import {
   OID_CONTENT_TYPE,
   OID_DATA,
   OID_MESSAGE_DIGEST,
+  OID_SHA256,
+  OID_SHA384,
+  OID_SHA512,
   OID_SIGNED_DATA,
+  OID_SIGNING_CERTIFICATE_V2,
   OID_SIGNING_TIME,
   OID_TIMESTAMP_TOKEN,
 } from "../oids";
 import type { DigestAlgorithm, Signer } from "../types";
+import { hashData } from "../utils";
 import {
   buildCMSAlgorithmProtection,
   encodeSignedAttributesForSigning,
@@ -34,11 +39,7 @@ import type { CMSCreateOptions, CMSFormatBuilder, CMSSignedData } from "./types"
  * CAdES Detached signature format builder.
  *
  * Creates CMS signatures compatible with PAdES (PDF Advanced Electronic Signatures).
- * Uses the same structure as PDFBox for maximum Adobe Reader compatibility.
- *
- * Note: While ETSI EN 319 122-1 requires ESS signing-certificate-v2 for CAdES-BES,
- * we omit it because Adobe Reader has issues recognizing timestamps when it's present.
- * PDFBox also omits this attribute.
+ * Includes ESS signing-certificate-v2 attribute as required by ETSI EN 319 122-1.
  */
 export class CAdESDetachedBuilder implements CMSFormatBuilder, CMSSignedData {
   private signedData!: pkijs.SignedData;
@@ -64,6 +65,7 @@ export class CAdESDetachedBuilder implements CMSFormatBuilder, CMSSignedData {
       documentHash,
       digestAlgorithm,
       signer,
+      signerCert,
       signingTime,
     );
 
@@ -152,6 +154,7 @@ export class CAdESDetachedBuilder implements CMSFormatBuilder, CMSSignedData {
     documentHash: Uint8Array,
     digestAlgorithm: DigestAlgorithm,
     signer: Signer,
+    signerCert: pkijs.Certificate,
     signingTime?: Date,
   ): pkijs.Attribute[] {
     const attrs: pkijs.Attribute[] = [];
@@ -185,6 +188,105 @@ export class CAdESDetachedBuilder implements CMSFormatBuilder, CMSSignedData {
       }),
     );
 
+    // ESS signing-certificate-v2 (required for CAdES/PAdES)
+    attrs.push(this.buildSigningCertificateV2(signerCert, digestAlgorithm));
+
     return attrs;
+  }
+
+  /**
+   * Build the ESS signing-certificate-v2 attribute (RFC 5035).
+   *
+   * This attribute binds the signing certificate to the signature,
+   * preventing certificate substitution attacks. It is required for
+   * CAdES-BES and PAdES-BES compliance.
+   *
+   * SigningCertificateV2 ::= SEQUENCE {
+   *   certs        SEQUENCE OF ESSCertIDv2,
+   *   policies     SEQUENCE OF PolicyInformation OPTIONAL
+   * }
+   *
+   * ESSCertIDv2 ::= SEQUENCE {
+   *   hashAlgorithm           AlgorithmIdentifier DEFAULT {sha256},
+   *   certHash                Hash,
+   *   issuerSerial            IssuerSerial OPTIONAL
+   * }
+   */
+  private buildSigningCertificateV2(
+    signerCert: pkijs.Certificate,
+    digestAlgorithm: DigestAlgorithm,
+  ): pkijs.Attribute {
+    // Hash the certificate
+    const certDer = signerCert.toSchema().toBER(false);
+    const certHash = hashData(new Uint8Array(certDer), digestAlgorithm);
+
+    // Build IssuerSerial using pkijs classes for proper encoding
+    // IssuerSerial ::= SEQUENCE {
+    //   issuer         GeneralNames,
+    //   serialNumber   CertificateSerialNumber
+    // }
+    const generalName = new pkijs.GeneralName({
+      type: 4, // directoryName
+      value: signerCert.issuer,
+    });
+
+    const generalNames = new pkijs.GeneralNames({
+      names: [generalName],
+    });
+
+    const issuerSerial = new pkijs.IssuerSerial({
+      issuer: generalNames,
+      serialNumber: signerCert.serialNumber,
+    });
+
+    // Build ESSCertIDv2
+    const essCertIdV2Parts: (Sequence | OctetString)[] = [];
+
+    // For SHA-256 (default), we can omit hashAlgorithm per RFC 5035
+    // For other algorithms, we must include it
+    if (digestAlgorithm !== "SHA-256") {
+      const algOid = this.getDigestAlgorithmOidForEss(digestAlgorithm);
+      essCertIdV2Parts.push(
+        new Sequence({
+          value: [new ObjectIdentifier({ value: algOid })],
+        }),
+      );
+    }
+
+    // certHash
+    essCertIdV2Parts.push(new OctetString({ valueHex: toArrayBuffer(certHash) }));
+
+    // issuerSerial - convert to ASN.1 schema
+    essCertIdV2Parts.push(issuerSerial.toSchema());
+
+    const essCertIdV2 = new Sequence({ value: essCertIdV2Parts });
+
+    // Build SigningCertificateV2: SEQUENCE { certs SEQUENCE OF ESSCertIDv2 }
+    const signingCertV2 = new Sequence({
+      value: [
+        new Sequence({
+          value: [essCertIdV2],
+        }),
+      ],
+    });
+
+    return new pkijs.Attribute({
+      type: OID_SIGNING_CERTIFICATE_V2,
+      values: [signingCertV2],
+    });
+  }
+
+  /**
+   * Get the digest algorithm OID for ESS signing-certificate-v2.
+   */
+  private getDigestAlgorithmOidForEss(digestAlgorithm: DigestAlgorithm): string {
+    switch (digestAlgorithm) {
+      case "SHA-256":
+        return OID_SHA256;
+      case "SHA-384":
+        return OID_SHA384;
+      case "SHA-512":
+        return OID_SHA512;
+    }
   }
 }

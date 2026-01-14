@@ -5,7 +5,6 @@
 import { sha256, sha384, sha512 } from "@noble/hashes/sha2.js";
 import { fromBER } from "asn1js";
 import * as pkijs from "pkijs";
-import { bytesToHex } from "#src/helpers/strings.ts";
 import { toArrayBuffer } from "../helpers/buffer";
 import { OID_SIGNED_DATA, OID_TIMESTAMP_TOKEN } from "./oids";
 import type { DigestAlgorithm } from "./types";
@@ -51,36 +50,6 @@ export function hashData(data: Uint8Array, algorithm: DigestAlgorithm): Uint8Arr
     case "SHA-512":
       return sha512(data);
   }
-}
-
-/**
- * Compute SHA-1 hash (for VRI keys and deduplication).
- *
- * Uses Web Crypto for SHA-1 since @noble/hashes focuses on SHA-2.
- *
- * @param data - Data to hash
- * @returns Hex-encoded hash string (lowercase)
- */
-export async function computeSha1Hex(data: Uint8Array): Promise<string> {
-  const buffer = toArrayBuffer(data);
-
-  const hash = await crypto.subtle.digest("SHA-1", buffer);
-
-  return bytesToHex(new Uint8Array(hash));
-}
-
-/**
- * Compute SHA-1 hash for VRI key (uppercase).
- *
- * DSS VRI dictionary keys are uppercase hex SHA-1 of signature Contents.
- *
- * @param data - Data to hash
- * @returns Uppercase hex-encoded hash string
- */
-export async function computeVriKey(data: Uint8Array): Promise<string> {
-  const hex = await computeSha1Hex(data);
-
-  return hex.toUpperCase();
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

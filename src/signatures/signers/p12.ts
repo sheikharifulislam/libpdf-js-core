@@ -7,6 +7,7 @@
 import { fromBER } from "asn1js";
 import * as pkijs from "pkijs";
 import { toArrayBuffer } from "../../helpers/buffer";
+import { buildCertificateChain } from "../aia";
 import { decryptLegacyPbe, installCryptoEngine, isLegacyPbeOid, PKCS12KDF } from "../crypto";
 import {
   OID_CERT_BAG,
@@ -19,7 +20,7 @@ import {
   OID_SECP521R1,
 } from "../oids";
 import type { DigestAlgorithm, KeyType, SignatureAlgorithm, Signer } from "../types";
-import { SignerError } from "../types";
+import { CertificateChainError, SignerError } from "../types";
 
 // Install our legacy crypto engine to handle 3DES/RC2 encrypted P12 files
 installCryptoEngine();
@@ -28,11 +29,40 @@ installCryptoEngine();
 const cryptoEngine = pkijs.getCrypto(true);
 
 /**
+ * Options for creating a P12Signer.
+ */
+export interface P12SignerOptions {
+  /**
+   * Build complete certificate chain using AIA (Authority Information Access).
+   *
+   * When enabled, the signer will fetch missing intermediate certificates
+   * from URLs embedded in the certificates. This ensures the CMS signature
+   * contains the full chain, which is important for validation.
+   *
+   * @default false
+   */
+  buildChain?: boolean;
+
+  /**
+   * Timeout for AIA certificate fetching in milliseconds.
+   * Only used when `buildChain` is true.
+   *
+   * @default 15000
+   */
+  chainTimeout?: number;
+}
+
+/**
  * Signer that uses a PKCS#12 (.p12/.pfx) file.
  *
  * @example
  * ```typescript
+ * // Basic usage
  * const signer = await P12Signer.create(p12Bytes, "password");
+ *
+ * // With automatic chain building via AIA
+ * const signer = await P12Signer.create(p12Bytes, "password", { buildChain: true });
+ *
  * const signature = await signer.sign(digest, "SHA-256");
  * ```
  */
@@ -63,10 +93,26 @@ export class P12Signer implements Signer {
    *
    * @param p12Bytes - The .p12/.pfx file contents
    * @param password - Password to decrypt the file
+   * @param options - Optional configuration
    * @returns A new P12Signer instance
    * @throws {SignerError} if the file is invalid or password is wrong
+   *
+   * @example
+   * ```typescript
+   * // Basic usage
+   * const signer = await P12Signer.create(p12Bytes, "password");
+   *
+   * // With automatic chain building (recommended for B-LT/B-LTA)
+   * const signer = await P12Signer.create(p12Bytes, "password", {
+   *   buildChain: true,
+   * });
+   * ```
    */
-  static async create(p12Bytes: Uint8Array, password: string): Promise<P12Signer> {
+  static async create(
+    p12Bytes: Uint8Array,
+    password: string,
+    options: P12SignerOptions = {},
+  ): Promise<P12Signer> {
     try {
       // Ensure we have a proper ArrayBuffer (not SharedArrayBuffer)
       const buffer = toArrayBuffer(p12Bytes);
@@ -156,9 +202,26 @@ export class P12Signer implements Signer {
 
       const signingCertDer = new Uint8Array(certificates[0].toSchema().toBER(false));
 
-      const chainCertsDer = certificates
+      let chainCertsDer: Uint8Array[] = certificates
         .slice(1)
         .map(cert => new Uint8Array(cert.toSchema().toBER(false)));
+
+      // Optionally build complete chain using AIA
+      if (options.buildChain) {
+        try {
+          chainCertsDer = await buildCertificateChain(signingCertDer, {
+            existingChain: chainCertsDer,
+            timeout: options.chainTimeout,
+          });
+        } catch (error) {
+          // If chain building fails, we still have what was in the P12
+          if (error instanceof CertificateChainError) {
+            console.warn(`Could not complete certificate chain via AIA: ${error.message}`);
+          } else {
+            throw error;
+          }
+        }
+      }
 
       return new P12Signer(privateKey, signingCertDer, chainCertsDer, keyType, signatureAlgorithm);
     } catch (error) {

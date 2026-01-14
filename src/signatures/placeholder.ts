@@ -8,7 +8,7 @@
  * PDF Reference: Section 12.8.1 "Signature Dictionary"
  */
 
-import { bytesToHex } from "#src/helpers/strings.ts";
+import { bytesToHex } from "#src/helpers/buffer.ts";
 import { PdfRaw } from "#src/objects/pdf-raw";
 import { PlaceholderError } from "./types";
 
@@ -332,7 +332,7 @@ export function patchContents(
   buffer: Uint8Array,
   placeholders: PlaceholderInfo,
   signature: Uint8Array,
-): void {
+): { paddedHex: string } {
   // Convert signature to uppercase hex
   const hexSignature = bytesToHex(signature);
 
@@ -349,6 +349,8 @@ export function patchContents(
   const hexBytes = encoder.encode(paddedHex);
 
   buffer.set(hexBytes, placeholders.contentsStart);
+
+  return { paddedHex };
 }
 
 /**

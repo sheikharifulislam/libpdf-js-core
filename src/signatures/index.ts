@@ -22,12 +22,22 @@
 export { generateUniqueName } from "../helpers/strings";
 // AIA Chain Building
 export { type AiaChainBuilderOptions, buildCertificateChain } from "./aia";
-// DSS (Document Security Store)
-export { DSSBuilder, type SignatureValidationData, type VriEntry } from "./dss";
+// LTV (Long-Term Validation) - DSS building and data gathering
+export {
+  DSSBuilder,
+  type LtvData,
+  LtvDataGatherer,
+  type LtvGathererOptions,
+  type LtvWarning,
+} from "./ltv";
 // Revocation
-export { DefaultRevocationProvider, type DefaultRevocationProviderOptions } from "./revocation";
+export {
+  DefaultRevocationProvider,
+  type DefaultRevocationProviderOptions,
+  extractOcspResponderCerts,
+} from "./revocation";
 // Signers
-export { CryptoKeySigner, P12Signer } from "./signers";
+export { CryptoKeySigner, P12Signer, type P12SignerOptions } from "./signers";
 // Timestamp
 export { HttpTimestampAuthority, type HttpTimestampAuthorityOptions } from "./timestamp";
 // Types

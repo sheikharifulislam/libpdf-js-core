@@ -1,7 +1,8 @@
+import { bytesToHex, hexToBytes } from "#src/helpers/buffer";
 import { CHAR_PARENTHESIS_CLOSE, CHAR_PARENTHESIS_OPEN } from "#src/helpers/chars";
 import { canEncodePdfDoc, decodeTextString, encodeTextString } from "#src/helpers/encoding";
-import { bytesToHex, escapeLiteralString, hexToBytes } from "#src/helpers/strings";
-import type { ByteWriter } from "#src/io/byte-writer";
+import { escapeLiteralString } from "#src/helpers/strings";
+import type { ByteWriter } from "#src/io/byte-writer.ts";
 import type { PdfPrimitive } from "./pdf-primitive";
 
 /**

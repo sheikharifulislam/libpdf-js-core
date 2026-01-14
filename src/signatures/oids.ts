@@ -37,9 +37,15 @@ export const OID_TIMESTAMP_TOKEN = "1.2.840.113549.1.9.16.2.14";
 /** id-ct-TSTInfo (RFC 3161) */
 export const OID_TST_INFO = "1.2.840.113549.1.9.16.1.4";
 
+/** id-aa-signingCertificateV2 (RFC 5035) - required for CAdES/PAdES */
+export const OID_SIGNING_CERTIFICATE_V2 = "1.2.840.113549.1.9.16.2.47";
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Digest Algorithms
 // ─────────────────────────────────────────────────────────────────────────────
+
+/** id-sha1 (used for OCSP certID - widely supported) */
+export const OID_SHA1 = "1.3.14.3.2.26";
 
 /** id-sha256 */
 export const OID_SHA256 = "2.16.840.1.101.3.4.2.1";
