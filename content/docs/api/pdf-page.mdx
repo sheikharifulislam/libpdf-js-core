@@ -534,6 +534,29 @@ await page.drawField(paymentRadio, {
 
 ---
 
+## Annotations
+
+PDFPage provides methods for adding and retrieving PDF annotations such as highlights, links, sticky notes, shapes, stamps, and freehand drawings.
+
+See the [Annotations](/docs/api/annotations) documentation for the complete API reference.
+
+```typescript
+// Add a highlight
+page.addHighlightAnnotation({
+  rect: { x: 100, y: 700, width: 200, height: 14 },
+  color: rgb(1, 1, 0),
+});
+
+// Get all annotations
+const annotations = await page.getAnnotations();
+
+// Get specific types
+const highlights = await page.getHighlightAnnotations();
+const links = await page.getLinkAnnotations();
+```
+
+---
+
 ## Text Extraction
 
 ### extractText(options?)

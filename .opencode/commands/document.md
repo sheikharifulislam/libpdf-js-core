@@ -9,96 +9,126 @@ You are creating proper markdown documentation for a module or feature in the li
 
 1. **Identify the scope** - What does `$ARGUMENTS` refer to? (file, directory, or feature name)
 2. **Read the source code** - Understand the public API, types, and behavior
-3. **Read existing docs** - Check if there's documentation to update
-4. **Write comprehensive documentation** - Create or update markdown docs
+3. **Read existing docs** - Check `content/docs/` for documentation to update
+4. **Write comprehensive documentation** - Create or update MDX docs
 
 ## Documentation Structure
 
-Create documentation in the appropriate location:
-- **API docs**: `docs/api/<module>.md`
-- **Guides**: `docs/guides/<topic>.md`
-- **Examples**: Include in the relevant doc or `docs/examples/`
+This project uses [Fumadocs](https://fumadocs.dev) for documentation. All docs live in `content/docs/` as MDX files.
 
-### API Documentation Format
-
-```markdown
-# <Module Name>
-
-Brief description of what this module does and when to use it.
-
-## Installation
-
-If there are specific imports needed.
-
-## Quick Start
-
-```typescript
-// Minimal working example
+```
+content/docs/
+├── index.mdx              # Landing page
+├── meta.json              # Root navigation order
+├── getting-started/       # Quickstart guides
+│   ├── installation.mdx
+│   ├── create-pdf.mdx
+│   └── parse-pdf.mdx
+├── guides/                # Feature guides
+│   ├── drawing.mdx
+│   ├── encryption.mdx
+|   |-- ...
+├── api/                   # API reference
+│   ├── pdf.mdx
+│   ├── pdf-page.mdx
+│   ├── pdf-form.mdx
+│   ├── ...
+├── concepts/              # Conceptual docs
+│   ├── pdf-structure.mdx
+│   ├── object-model.mdx
+│   └── incremental-saves.mdx
+├── advanced/              # Advanced topics
+│   └── library-authors.mdx
+└── migration/             # Migration guides
+    └── from-pdf-lib.mdx
 ```
 
-## API Reference
+### Where to Put Documentation
 
-### `ClassName`
+| Type | Location | When to use |
+|------|----------|-------------|
+| **API Reference** | `content/docs/api/<class>.mdx` | Documenting a class like `PDF`, `PDFPage`, `PDFForm` |
+| **Feature Guide** | `content/docs/guides/<feature>.mdx` | How-to guides for features (forms, signatures, etc.) |
+| **Concept** | `content/docs/concepts/<topic>.mdx` | Explaining PDF concepts (structure, objects, etc.) |
+| **Getting Started** | `content/docs/getting-started/` | Installation and first steps |
 
-Description of the class.
+### Navigation (meta.json)
 
-#### Constructor
+Each directory has a `meta.json` that controls navigation order:
 
-```typescript
-new ClassName(options: Options)
-```
-
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| options | `Options` | Configuration options |
-
-#### Methods
-
-##### `methodName(param: Type): ReturnType`
-
-Description of what the method does.
-
-**Parameters:**
-- `param` - Description
-
-**Returns:** Description of return value
-
-**Example:**
-```typescript
-// Usage example
-```
-
-### Types
-
-#### `TypeName`
-
-```typescript
-interface TypeName {
-  property: string;
+```json
+{
+  "title": "API Reference",
+  "pages": ["index", "---Classes---", "pdf", "pdf-page", "pdf-form", "annotations", "---Other---", "errors"]
 }
 ```
 
-## Examples
+- Use `---Label---` for section dividers
+- Order determines sidebar appearance
 
-### Common Use Case
+### MDX File Format
 
-```typescript
-// Full working example
+```mdx
+---
+title: ModuleName
+description: Brief description for SEO and previews.
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+
+# ModuleName
+
+Brief description of what this module does and when to use it.
+
+<Callout type="warn" title="my title">
+Use callouts sparingly for important warnings or beta features.
+</Callout>
+
+## Quick Start
+
+\`\`\`typescript
+import { PDF } from "@libpdf/core";
+// Minimal working example
+\`\`\`
+
+---
+
+## methodName(options)
+
+Description of what the method does.
+
+| Param | Type | Default | Description |
+|-------|------|---------|-------------|
+| `param` | `string` | required | What it does |
+| `[optional]` | `number` | `10` | Optional param |
+
+**Returns**: `ReturnType`
+
+\`\`\`typescript
+// Usage example
+\`\`\`
+
+---
+
+## Types
+
+### TypeName
+
+\`\`\`typescript
+interface TypeName {
+  property: string;
+}
+\`\`\`
 ```
 
-### Advanced Usage
+### Fumadocs Components
 
-```typescript
-// More complex example
-```
+```mdx
+import { Callout } from 'fumadocs-ui/components/callout';
 
-## Error Handling
-
-Document common errors and how to handle them.
-
-## See Also
-
-- Links to related documentation
+<Callout type="info">Informational note</Callout>
+<Callout type="warn">Warning message</Callout>
+<Callout type="error">Error/danger message</Callout>
 ```
 
 ## Guidelines
@@ -116,25 +146,31 @@ Document common errors and how to handle them.
 - Progress from simple to complex
 
 ### Formatting
-- Use proper markdown headers (h1 for title, h2 for sections)
+- Use `---` horizontal rules between major sections
 - Use code fences with `typescript` language tag
 - Use tables for parameter/option documentation
-- Use admonitions sparingly (> **Note:** ...)
+- Use Fumadocs `<Callout>` components sparingly
+
+### Cross-References
+- Link to related docs: `[PDFPage](/docs/api/pdf-page)`
+- Add "See Also" sections when helpful
+- Update `meta.json` when adding new pages
 
 ### Maintenance
 - Include types inline so docs don't get stale
 - Reference source file locations for complex behavior
-- Date or version-stamp if behavior may change
+- Use `<Callout type="warn">` for beta/unstable features
 
 ## Process
 
 1. **Explore the code** - Read source files to understand the API
-2. **Identify the audience** - Who will read this? What do they need?
-3. **Draft the structure** - Outline sections before writing
-4. **Write content** - Fill in each section
-5. **Add examples** - Create working code samples
-6. **Review** - Read through for clarity and accuracy
+2. **Check existing docs** - Look in `content/docs/` for related pages
+3. **Identify the audience** - Who will read this? What do they need?
+4. **Draft the structure** - Outline sections before writing
+5. **Write content** - Fill in each section with examples
+6. **Update navigation** - Add to relevant `meta.json` if new page
+7. **Add cross-references** - Link from related docs
 
 ## Begin
 
-Analyze `$ARGUMENTS`, read the relevant source code, and create comprehensive markdown documentation.
+Analyze `$ARGUMENTS`, read the relevant source code, and create comprehensive MDX documentation in `content/docs/`.
