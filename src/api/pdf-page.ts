@@ -19,6 +19,37 @@
  * ```
  */
 
+// Annotation types
+import type { PDFAnnotation } from "#src/annotations/base";
+import type { PDFCaretAnnotation } from "#src/annotations/caret";
+import { createAnnotation, isPopupAnnotation, isWidgetAnnotation } from "#src/annotations/factory";
+import type { PDFFileAttachmentAnnotation } from "#src/annotations/file-attachment";
+import type { PDFFreeTextAnnotation } from "#src/annotations/free-text";
+import { PDFInkAnnotation } from "#src/annotations/ink";
+import { PDFLineAnnotation } from "#src/annotations/line";
+import { PDFLinkAnnotation } from "#src/annotations/link";
+import type { PDFPolygonAnnotation, PDFPolylineAnnotation } from "#src/annotations/polygon";
+import { PDFPopupAnnotation } from "#src/annotations/popup";
+import { PDFCircleAnnotation, PDFSquareAnnotation } from "#src/annotations/square-circle";
+import { PDFStampAnnotation } from "#src/annotations/stamp";
+import { PDFTextAnnotation } from "#src/annotations/text";
+import {
+  PDFHighlightAnnotation,
+  PDFSquigglyAnnotation,
+  PDFStrikeOutAnnotation,
+  PDFUnderlineAnnotation,
+} from "#src/annotations/text-markup";
+import type {
+  CircleAnnotationOptions,
+  InkAnnotationOptions,
+  LineAnnotationOptions,
+  LinkAnnotationOptions,
+  RemoveAnnotationsOptions,
+  SquareAnnotationOptions,
+  StampAnnotationOptions,
+  TextAnnotationOptions,
+  TextMarkupAnnotationOptions,
+} from "#src/annotations/types";
 import type { Operator } from "#src/content/operators";
 import { AcroForm } from "#src/document/forms/acro-form";
 import { AppearanceGenerator } from "#src/document/forms/appearance-generator";
@@ -36,6 +67,7 @@ import { parseFont } from "#src/fonts/font-factory";
 import type { PdfFont } from "#src/fonts/pdf-font";
 import { isStandard14Font } from "#src/fonts/standard-14";
 import { parseToUnicode } from "#src/fonts/to-unicode";
+// Annotation utilities - imported here to avoid dynamic require issues
 import { black } from "#src/helpers/colors";
 import {
   beginText,
@@ -522,7 +554,7 @@ export class PDFPage {
     if (!widget.ref) {
       throw new Error("Widget annotation must have a reference");
     }
-    this.addAnnotation(widget.ref);
+    this.addAnnotationRef(widget.ref);
 
     // Generate appearance stream for the widget
     await this.generateWidgetAppearance(field, widget, options);
@@ -690,20 +722,6 @@ export class PDFPage {
         break;
       }
     }
-  }
-
-  /**
-   * Add an annotation reference to the page's /Annots array.
-   */
-  private addAnnotation(annotRef: PdfRef): void {
-    let annots = this.dict.getArray("Annots");
-
-    if (!annots) {
-      annots = new PdfArray([]);
-      this.dict.set("Annots", annots);
-    }
-
-    annots.push(annotRef);
   }
 
   // ─────────────────────────────────────────────────────────────────────────────
@@ -1166,6 +1184,681 @@ export class PDFPage {
       (fillOpacity, strokeOpacity) =>
         this.registerGraphicsStateForOpacity(fillOpacity, strokeOpacity),
     );
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Annotations
+  // ─────────────────────────────────────────────────────────────────────────────
+
+  /** Cached annotations for this page */
+  private _annotationCache: PDFAnnotation[] | null = null;
+
+  /**
+   * Get all annotations on this page (excludes Widget and Popup annotations).
+   *
+   * Widget annotations are handled by the forms subsystem via PDFForm.
+   * Popup annotations are accessed via annotation.getPopup().
+   *
+   * Results are cached - repeated calls return the same instances.
+   * The cache is invalidated when annotations are added or removed.
+   *
+   * @returns Array of annotation objects
+   *
+   * @example
+   * ```typescript
+   * const annotations = await page.getAnnotations();
+   * for (const annot of annotations) {
+   *   console.log(annot.type, annot.contents);
+   * }
+   * ```
+   */
+  async getAnnotations(): Promise<PDFAnnotation[]> {
+    if (this._annotationCache) {
+      return this._annotationCache;
+    }
+
+    const annotations: PDFAnnotation[] = [];
+    const annotsArray = this.dict.getArray("Annots");
+
+    if (!annotsArray || !this.ctx) {
+      this._annotationCache = annotations;
+
+      return annotations;
+    }
+
+    for (let i = 0; i < annotsArray.length; i++) {
+      const entry = annotsArray.at(i);
+
+      if (!entry) {
+        continue;
+      }
+
+      let annotDict: PdfDict | null = null;
+      let annotRef: PdfRef | null = null;
+
+      if (entry instanceof PdfRef) {
+        annotRef = entry;
+        const resolved = await this.ctx.resolve(entry);
+
+        if (resolved instanceof PdfDict) {
+          annotDict = resolved;
+        }
+      } else if (entry instanceof PdfDict) {
+        annotDict = entry;
+      }
+
+      if (!annotDict) {
+        continue;
+      }
+
+      // Skip Widget annotations (handled by forms subsystem)
+      if (isWidgetAnnotation(annotDict)) {
+        continue;
+      }
+
+      // Skip Popup annotations (accessed via parent annotation)
+      if (isPopupAnnotation(annotDict)) {
+        continue;
+      }
+
+      annotations.push(createAnnotation(annotDict, annotRef, this.ctx.registry));
+    }
+
+    this._annotationCache = annotations;
+
+    return annotations;
+  }
+
+  /**
+   * Get all popup annotations on this page.
+   *
+   * Popups are typically accessed via their parent markup annotation
+   * using `annotation.getPopup()`, but this method allows direct access.
+   */
+  async getPopupAnnotations(): Promise<PDFPopupAnnotation[]> {
+    const popups: PDFPopupAnnotation[] = [];
+    const annotsArray = this.dict.getArray("Annots");
+
+    if (!annotsArray || !this.ctx) {
+      return popups;
+    }
+
+    for (let i = 0; i < annotsArray.length; i++) {
+      const entry = annotsArray.at(i);
+
+      if (!entry) {
+        continue;
+      }
+
+      let annotDict: PdfDict | null = null;
+      let annotRef: PdfRef | null = null;
+
+      if (entry instanceof PdfRef) {
+        annotRef = entry;
+        const resolved = await this.ctx.resolve(entry);
+
+        if (resolved instanceof PdfDict) {
+          annotDict = resolved;
+        }
+      } else if (entry instanceof PdfDict) {
+        annotDict = entry;
+      }
+
+      if (!annotDict || !isPopupAnnotation(annotDict)) {
+        continue;
+      }
+
+      popups.push(new PDFPopupAnnotation(annotDict, annotRef, this.ctx.registry));
+    }
+
+    return popups;
+  }
+
+  // Type-specific annotation getters
+
+  /**
+   * Get all highlight annotations on this page.
+   */
+  async getHighlightAnnotations(): Promise<PDFHighlightAnnotation[]> {
+    const annotations = await this.getAnnotations();
+
+    return annotations.filter((a): a is PDFHighlightAnnotation => a.type === "Highlight");
+  }
+
+  /**
+   * Get all underline annotations on this page.
+   */
+  async getUnderlineAnnotations(): Promise<PDFUnderlineAnnotation[]> {
+    const annotations = await this.getAnnotations();
+
+    return annotations.filter((a): a is PDFUnderlineAnnotation => a.type === "Underline");
+  }
+
+  /**
+   * Get all strikeout annotations on this page.
+   */
+  async getStrikeOutAnnotations(): Promise<PDFStrikeOutAnnotation[]> {
+    const annotations = await this.getAnnotations();
+
+    return annotations.filter((a): a is PDFStrikeOutAnnotation => a.type === "StrikeOut");
+  }
+
+  /**
+   * Get all squiggly annotations on this page.
+   */
+  async getSquigglyAnnotations(): Promise<PDFSquigglyAnnotation[]> {
+    const annotations = await this.getAnnotations();
+
+    return annotations.filter((a): a is PDFSquigglyAnnotation => a.type === "Squiggly");
+  }
+
+  /**
+   * Get all link annotations on this page.
+   */
+  async getLinkAnnotations(): Promise<PDFLinkAnnotation[]> {
+    const annotations = await this.getAnnotations();
+
+    return annotations.filter((a): a is PDFLinkAnnotation => a.type === "Link");
+  }
+
+  /**
+   * Get all text annotations (sticky notes) on this page.
+   */
+  async getTextAnnotations(): Promise<PDFTextAnnotation[]> {
+    const annotations = await this.getAnnotations();
+
+    return annotations.filter((a): a is PDFTextAnnotation => a.type === "Text");
+  }
+
+  /**
+   * Get all free text annotations on this page.
+   */
+  async getFreeTextAnnotations(): Promise<PDFFreeTextAnnotation[]> {
+    const annotations = await this.getAnnotations();
+
+    return annotations.filter((a): a is PDFFreeTextAnnotation => a.type === "FreeText");
+  }
+
+  /**
+   * Get all line annotations on this page.
+   */
+  async getLineAnnotations(): Promise<PDFLineAnnotation[]> {
+    const annotations = await this.getAnnotations();
+
+    return annotations.filter((a): a is PDFLineAnnotation => a.type === "Line");
+  }
+
+  /**
+   * Get all square annotations on this page.
+   */
+  async getSquareAnnotations(): Promise<PDFSquareAnnotation[]> {
+    const annotations = await this.getAnnotations();
+
+    return annotations.filter((a): a is PDFSquareAnnotation => a.type === "Square");
+  }
+
+  /**
+   * Get all circle annotations on this page.
+   */
+  async getCircleAnnotations(): Promise<PDFCircleAnnotation[]> {
+    const annotations = await this.getAnnotations();
+
+    return annotations.filter((a): a is PDFCircleAnnotation => a.type === "Circle");
+  }
+
+  /**
+   * Get all stamp annotations on this page.
+   */
+  async getStampAnnotations(): Promise<PDFStampAnnotation[]> {
+    const annotations = await this.getAnnotations();
+
+    return annotations.filter((a): a is PDFStampAnnotation => a.type === "Stamp");
+  }
+
+  /**
+   * Get all ink annotations on this page.
+   */
+  async getInkAnnotations(): Promise<PDFInkAnnotation[]> {
+    const annotations = await this.getAnnotations();
+
+    return annotations.filter((a): a is PDFInkAnnotation => a.type === "Ink");
+  }
+
+  /**
+   * Get all polygon annotations on this page.
+   */
+  async getPolygonAnnotations(): Promise<PDFPolygonAnnotation[]> {
+    const annotations = await this.getAnnotations();
+
+    return annotations.filter((a): a is PDFPolygonAnnotation => a.type === "Polygon");
+  }
+
+  /**
+   * Get all polyline annotations on this page.
+   */
+  async getPolylineAnnotations(): Promise<PDFPolylineAnnotation[]> {
+    const annotations = await this.getAnnotations();
+
+    return annotations.filter((a): a is PDFPolylineAnnotation => a.type === "PolyLine");
+  }
+
+  /**
+   * Get all caret annotations on this page.
+   */
+  async getCaretAnnotations(): Promise<PDFCaretAnnotation[]> {
+    const annotations = await this.getAnnotations();
+
+    return annotations.filter((a): a is PDFCaretAnnotation => a.type === "Caret");
+  }
+
+  /**
+   * Get all file attachment annotations on this page.
+   */
+  async getFileAttachmentAnnotations(): Promise<PDFFileAttachmentAnnotation[]> {
+    const annotations = await this.getAnnotations();
+
+    return annotations.filter((a): a is PDFFileAttachmentAnnotation => a.type === "FileAttachment");
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Adding Annotations
+  // ─────────────────────────────────────────────────────────────────────────────
+
+  /**
+   * Add a highlight annotation.
+   *
+   * @param options - Highlight options (rect, rects, or quadPoints)
+   * @returns The created annotation
+   *
+   * @example
+   * ```typescript
+   * // Simple rect for horizontal text
+   * page.addHighlightAnnotation({
+   *   rect: { x: 100, y: 680, width: 200, height: 20 },
+   *   color: rgb(1, 1, 0),
+   * });
+   *
+   * // Multiple rects for multi-line selection
+   * page.addHighlightAnnotation({
+   *   rects: [
+   *     { x: 100, y: 700, width: 400, height: 14 },
+   *     { x: 100, y: 680, width: 250, height: 14 },
+   *   ],
+   *   color: rgb(1, 1, 0),
+   * });
+   * ```
+   */
+  addHighlightAnnotation(options: TextMarkupAnnotationOptions): PDFHighlightAnnotation {
+    return this.addTextMarkupAnnotation("Highlight", options) as PDFHighlightAnnotation;
+  }
+
+  /**
+   * Add an underline annotation.
+   */
+  addUnderlineAnnotation(options: TextMarkupAnnotationOptions): PDFUnderlineAnnotation {
+    return this.addTextMarkupAnnotation("Underline", options) as PDFUnderlineAnnotation;
+  }
+
+  /**
+   * Add a strikeout annotation.
+   */
+  addStrikeOutAnnotation(options: TextMarkupAnnotationOptions): PDFStrikeOutAnnotation {
+    return this.addTextMarkupAnnotation("StrikeOut", options) as PDFStrikeOutAnnotation;
+  }
+
+  /**
+   * Add a squiggly underline annotation.
+   */
+  addSquigglyAnnotation(options: TextMarkupAnnotationOptions): PDFSquigglyAnnotation {
+    return this.addTextMarkupAnnotation("Squiggly", options) as PDFSquigglyAnnotation;
+  }
+
+  /**
+   * Add a text markup annotation (internal helper).
+   */
+  private addTextMarkupAnnotation(
+    subtype: "Highlight" | "Underline" | "StrikeOut" | "Squiggly",
+    options: TextMarkupAnnotationOptions,
+  ): PDFAnnotation {
+    if (!this.ctx) {
+      throw new Error("Cannot add annotation to page without context");
+    }
+
+    // Use the static create method on the appropriate class
+    let annotDict: PdfDict;
+
+    switch (subtype) {
+      case "Highlight":
+        annotDict = PDFHighlightAnnotation.create(options);
+        break;
+      case "Underline":
+        annotDict = PDFUnderlineAnnotation.create(options);
+        break;
+      case "StrikeOut":
+        annotDict = PDFStrikeOutAnnotation.create(options);
+        break;
+      case "Squiggly":
+        annotDict = PDFSquigglyAnnotation.create(options);
+        break;
+    }
+
+    // Register and add to page
+    const annotRef = this.ctx.register(annotDict);
+    this.addAnnotationRef(annotRef);
+
+    return createAnnotation(annotDict, annotRef, this.ctx.registry);
+  }
+
+  /**
+   * Add a link annotation.
+   *
+   * @param options - Link options (uri or destination)
+   * @returns The created annotation
+   *
+   * @example
+   * ```typescript
+   * // External link
+   * page.addLinkAnnotation({
+   *   rect: { x: 100, y: 600, width: 200, height: 20 },
+   *   uri: "https://example.com",
+   * });
+   *
+    * // Internal link to another page (recommended)
+    * page.addLinkAnnotation({
+    *   rect: { x: 100, y: 550, width: 200, height: 20 },
+    *   destination: { page: otherPage, type: "Fit" },
+    * });
+    *
+    * // Or using a page reference directly
+    * page.addLinkAnnotation({
+    *   rect: { x: 100, y: 520, width: 200, height: 20 },
+    *   destination: { page: otherPage.ref, type: "Fit" },
+    * });
+
+   * ```
+   */
+  addLinkAnnotation(options: LinkAnnotationOptions): PDFLinkAnnotation {
+    if (!this.ctx) {
+      throw new Error("Cannot add annotation to page without context");
+    }
+
+    const destination = options.destination;
+
+    if (destination) {
+      const destinationPage = destination.page;
+
+      const destinationPageRef =
+        destinationPage instanceof PDFPage ? destinationPage.ref : destinationPage;
+
+      if (!(destinationPageRef instanceof PdfRef)) {
+        throw new Error("Link destination page must be a PDFPage or PdfRef");
+      }
+
+      const pageRefs = this.ctx.pages.getPages();
+      const matchesPage = pageRefs.some(
+        ref =>
+          ref.objectNumber === destinationPageRef.objectNumber &&
+          ref.generation === destinationPageRef.generation,
+      );
+
+      if (!matchesPage) {
+        throw new Error("Link destination page ref not found in document");
+      }
+    }
+
+    const annotDict = PDFLinkAnnotation.create(options);
+
+    // Register and add to page
+    const annotRef = this.ctx.register(annotDict);
+    this.addAnnotationRef(annotRef);
+
+    return createAnnotation(annotDict, annotRef, this.ctx.registry) as PDFLinkAnnotation;
+  }
+
+  /**
+   * Add a text annotation (sticky note).
+   *
+   * @param options - Text annotation options
+   * @returns The created annotation
+   */
+  addTextAnnotation(options: TextAnnotationOptions): PDFTextAnnotation {
+    if (!this.ctx) {
+      throw new Error("Cannot add annotation to page without context");
+    }
+
+    const annotDict = PDFTextAnnotation.create(options);
+
+    // Register and add to page
+    const annotRef = this.ctx.register(annotDict);
+    this.addAnnotationRef(annotRef);
+
+    return createAnnotation(annotDict, annotRef, this.ctx.registry) as PDFTextAnnotation;
+  }
+
+  /**
+   * Add a line annotation.
+   *
+   * @param options - Line annotation options
+   * @returns The created annotation
+   */
+  addLineAnnotation(options: LineAnnotationOptions): PDFLineAnnotation {
+    if (!this.ctx) {
+      throw new Error("Cannot add annotation to page without context");
+    }
+
+    const annotDict = PDFLineAnnotation.create(options);
+
+    // Register and add to page
+    const annotRef = this.ctx.register(annotDict);
+    this.addAnnotationRef(annotRef);
+
+    return createAnnotation(annotDict, annotRef, this.ctx.registry) as PDFLineAnnotation;
+  }
+
+  /**
+   * Add a square (rectangle) annotation.
+   *
+   * @param options - Square annotation options
+   * @returns The created annotation
+   */
+  addSquareAnnotation(options: SquareAnnotationOptions): PDFSquareAnnotation {
+    if (!this.ctx) {
+      throw new Error("Cannot add annotation to page without context");
+    }
+
+    const annotDict = PDFSquareAnnotation.create(options);
+
+    // Register and add to page
+    const annotRef = this.ctx.register(annotDict);
+    this.addAnnotationRef(annotRef);
+
+    return createAnnotation(annotDict, annotRef, this.ctx.registry) as PDFSquareAnnotation;
+  }
+
+  /**
+   * Add a circle (ellipse) annotation.
+   *
+   * @param options - Circle annotation options
+   * @returns The created annotation
+   */
+  addCircleAnnotation(options: CircleAnnotationOptions): PDFCircleAnnotation {
+    if (!this.ctx) {
+      throw new Error("Cannot add annotation to page without context");
+    }
+
+    const annotDict = PDFCircleAnnotation.create(options);
+
+    // Register and add to page
+    const annotRef = this.ctx.register(annotDict);
+    this.addAnnotationRef(annotRef);
+
+    return createAnnotation(annotDict, annotRef, this.ctx.registry) as PDFCircleAnnotation;
+  }
+
+  /**
+   * Add a stamp annotation.
+   *
+   * @param options - Stamp annotation options
+   * @returns The created annotation
+   */
+  addStampAnnotation(options: StampAnnotationOptions): PDFStampAnnotation {
+    if (!this.ctx) {
+      throw new Error("Cannot add annotation to page without context");
+    }
+
+    const annotDict = PDFStampAnnotation.create(options);
+
+    // Register and add to page
+    const annotRef = this.ctx.register(annotDict);
+    this.addAnnotationRef(annotRef);
+
+    return createAnnotation(annotDict, annotRef, this.ctx.registry) as PDFStampAnnotation;
+  }
+
+  /**
+   * Add an ink (freehand drawing) annotation.
+   *
+   * @param options - Ink annotation options
+   * @returns The created annotation
+   */
+  addInkAnnotation(options: InkAnnotationOptions): PDFInkAnnotation {
+    if (!this.ctx) {
+      throw new Error("Cannot add annotation to page without context");
+    }
+
+    const annotDict = PDFInkAnnotation.create(options);
+
+    // Register and add to page
+    const annotRef = this.ctx.register(annotDict);
+    this.addAnnotationRef(annotRef);
+
+    return createAnnotation(annotDict, annotRef, this.ctx.registry) as PDFInkAnnotation;
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Removing Annotations
+  // ─────────────────────────────────────────────────────────────────────────────
+
+  /**
+   * Remove a specific annotation from the page.
+   *
+   * Also removes any linked Popup annotation.
+   *
+   * @param annotation - The annotation to remove
+   *
+   * @example
+   * ```typescript
+   * const highlights = await page.getHighlightAnnotations();
+   * await page.removeAnnotation(highlights[0]);
+   * ```
+   */
+  async removeAnnotation(annotation: PDFAnnotation): Promise<void> {
+    if (!this.ctx) {
+      return;
+    }
+
+    const annots = this.dict.getArray("Annots");
+
+    if (!annots) {
+      return;
+    }
+
+    const removeMatchingEntry = (predicate: (entry: unknown) => boolean): void => {
+      for (let i = 0; i < annots.length; i++) {
+        const entry = annots.at(i);
+
+        if (predicate(entry)) {
+          annots.remove(i);
+          return;
+        }
+      }
+    };
+
+    const annotRef = annotation.ref;
+
+    if (annotRef) {
+      // Find and remove the annotation reference
+      removeMatchingEntry(
+        entry =>
+          entry instanceof PdfRef &&
+          entry.objectNumber === annotRef.objectNumber &&
+          entry.generation === annotRef.generation,
+      );
+    } else {
+      // Direct annotation dict entry
+      removeMatchingEntry(entry => entry instanceof PdfDict && entry === annotation.dict);
+    }
+
+    // Check if the annotation has an associated Popup to remove
+    const popup = annotation.dict.get("Popup");
+
+    if (popup instanceof PdfRef) {
+      removeMatchingEntry(
+        entry =>
+          entry instanceof PdfRef &&
+          entry.objectNumber === popup.objectNumber &&
+          entry.generation === popup.generation,
+      );
+    } else if (popup instanceof PdfDict) {
+      removeMatchingEntry(entry => entry instanceof PdfDict && entry === popup);
+    }
+
+    this.invalidateAnnotationCache();
+  }
+
+  /**
+   * Remove annotations from the page.
+   *
+   * Without options, removes all annotations (except Widget annotations).
+   * With type filter, removes only annotations of the specified type.
+   *
+   * @param options - Optional filter by annotation type
+   *
+   * @example
+   * ```typescript
+   * // Remove all highlights
+   * await page.removeAnnotations({ type: "Highlight" });
+   *
+   * // Remove all annotations
+   * await page.removeAnnotations();
+   * ```
+   */
+  async removeAnnotations(options?: RemoveAnnotationsOptions): Promise<void> {
+    const annotations = await this.getAnnotations();
+
+    let toRemove = annotations;
+
+    if (options?.type) {
+      toRemove = annotations.filter(a => a.type === options.type);
+    }
+
+    for (const annotation of toRemove) {
+      await this.removeAnnotation(annotation);
+    }
+  }
+
+  /**
+   * Add an annotation reference to the page's /Annots array.
+   * Internal method - also invalidates the annotation cache.
+   */
+  private addAnnotationRef(annotRef: PdfRef): void {
+    let annots = this.dict.getArray("Annots");
+
+    if (!annots) {
+      annots = new PdfArray([]);
+      this.dict.set("Annots", annots);
+    }
+
+    annots.push(annotRef);
+    this.invalidateAnnotationCache();
+  }
+
+  /**
+   * Invalidate the annotation cache.
+   * Called when annotations are added or removed.
+   */
+  private invalidateAnnotationCache(): void {
+    this._annotationCache = null;
   }
 
   // ─────────────────────────────────────────────────────────────────────────────
