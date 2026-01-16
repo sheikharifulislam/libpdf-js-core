@@ -119,13 +119,13 @@ import type { PDFEmbeddedPage } from "./pdf-embedded-page";
  */
 export interface Rectangle {
   /** Left x coordinate */
-  x1: number;
+  x: number;
   /** Bottom y coordinate */
-  y1: number;
-  /** Right x coordinate */
-  x2: number;
-  /** Top y coordinate */
-  y2: number;
+  y: number;
+  /** Width */
+  width: number;
+  /** Height */
+  height: number;
 }
 
 /**
@@ -217,7 +217,7 @@ export class PDFPage {
    * If no MediaBox is found, returns a default US Letter size.
    */
   getMediaBox(): Rectangle {
-    return this.getBox("MediaBox") ?? { x1: 0, y1: 0, x2: 612, y2: 792 };
+    return this.getBox("MediaBox") ?? { x: 0, y: 0, width: 612, height: 792 };
   }
 
   /**
@@ -263,14 +263,22 @@ export class PDFPage {
    * returns the height of the MediaBox instead.
    */
   get width(): number {
-    const box = this.getMediaBox();
+    const mediaBox = this.getMediaBox();
+    const cropBox = this.getCropBox();
+
+    let box = mediaBox;
+
+    if (cropBox.width < mediaBox.width || cropBox.height < mediaBox.height) {
+      box = cropBox;
+    }
+
     const rotation = this.rotation;
 
     if (rotation === 90 || rotation === 270) {
-      return Math.abs(box.y2 - box.y1);
+      return Math.abs(box.height);
     }
 
-    return Math.abs(box.x2 - box.x1);
+    return Math.abs(box.width);
   }
 
   /**
@@ -280,14 +288,22 @@ export class PDFPage {
    * returns the width of the MediaBox instead.
    */
   get height(): number {
-    const box = this.getMediaBox();
+    const mediaBox = this.getMediaBox();
+    const cropBox = this.getCropBox();
+
+    let box = mediaBox;
+
+    if (cropBox.width < mediaBox.width || cropBox.height < mediaBox.height) {
+      box = cropBox;
+    }
+
     const rotation = this.rotation;
 
     if (rotation === 90 || rotation === 270) {
-      return Math.abs(box.x2 - box.x1);
+      return Math.abs(box.width);
     }
 
-    return Math.abs(box.y2 - box.y1);
+    return Math.abs(box.height);
   }
 
   /**
@@ -439,8 +455,8 @@ export class PDFPage {
 
     // Apply transformation matrix: [scaleX 0 0 scaleY x y]
     // Account for the embedded page's BBox origin
-    const translateX = x - embedded.box.x1 * scaleX;
-    const translateY = y - embedded.box.y1 * scaleY;
+    const translateX = x - embedded.box.x * scaleX;
+    const translateY = y - embedded.box.y * scaleY;
     ops.push(
       `${this.formatNumber(scaleX)} 0 0 ${this.formatNumber(scaleY)} ${this.formatNumber(translateX)} ${this.formatNumber(translateY)} cm`,
     );
@@ -2069,10 +2085,10 @@ export class PDFPage {
     }
 
     return {
-      x1: x1.value,
-      y1: y1.value,
-      x2: x2.value,
-      y2: y2.value,
+      x: x1.value,
+      y: y1.value,
+      width: x2.value,
+      height: y2.value,
     };
   }
 
