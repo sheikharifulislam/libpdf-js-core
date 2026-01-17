@@ -173,8 +173,8 @@ For now, you can add visual elements like text or images separately using the dr
 Sign an existing signature field:
 
 ```ts
-const form = await pdf.getForm();
-const signatureField = form.getSignatureField("SignatureField1");
+const form = pdf.getForm();
+const signatureField = form?.getSignatureField("SignatureField1");
 
 await pdf.sign({
   signer,
@@ -212,10 +212,8 @@ await writeFile("signed.pdf", fullySigned.bytes);
 ## Check Existing Signatures
 
 ```ts
-import { SignatureField } from "@libpdf/core";
-
-const form = await pdf.getForm();
-const signatureFields = form.getSignatureFields();
+const form = pdf.getForm();
+const signatureFields = form?.getSignatureFields() ?? [];
 
 for (const field of signatureFields) {
   if (field.isSigned()) {

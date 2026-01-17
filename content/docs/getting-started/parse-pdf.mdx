@@ -71,7 +71,7 @@ console.log(pdf.getProducer()); // "@libpdf/core"
 ### Page Dimensions
 
 ```ts
-const page = await pdf.getPage(0); // Zero-indexed
+const page = pdf.getPage(0); // Zero-indexed
 const { width, height } = page;
 
 console.log(`${width} x ${height} points`);
@@ -99,8 +99,8 @@ const rotation = page.rotation; // 0, 90, 180, or 270
 Get all text from a page as a single string:
 
 ```ts
-const page = await pdf.getPage(0);
-const pageText = await page.extractText();
+const page = pdf.getPage(0);
+const pageText = page.extractText();
 
 console.log(pageText.text);
 ```
@@ -110,7 +110,7 @@ console.log(pageText.text);
 Get text lines with their coordinates for more advanced processing:
 
 ```ts
-const pageText = await page.extractText();
+const pageText = page.extractText();
 
 for (const line of pageText.lines) {
   console.log(`"${line.text}" at (${line.bbox.x}, ${line.bbox.y})`);
@@ -129,10 +129,10 @@ Find text matching a pattern:
 
 ```ts
 // String search
-const results = await page.findText("invoice");
+const results = page.findText("invoice");
 
 // Regex search
-const invoiceNumbers = await page.findText(/INV-\d{6}/g);
+const invoiceNumbers = page.findText(/INV-\d{6}/g);
 
 for (const match of results) {
   console.log(`Found "${match.text}" at`, match.bbox);
@@ -142,10 +142,10 @@ for (const match of results) {
 ## Iterate Over Pages
 
 ```ts
-const pages = await pdf.getPages();
+const pages = pdf.getPages();
 
 for (const page of pages) {
-  const pageText = await page.extractText();
+  const pageText = page.extractText();
   console.log(`Page ${page.index + 1}: ${pageText.text.slice(0, 100)}...`);
 }
 ```
@@ -153,7 +153,7 @@ for (const page of pages) {
 ## Check for Forms
 
 ```ts
-const form = await pdf.getForm();
+const form = pdf.getForm();
 
 if (form && !form.isEmpty) {
   const fields = form.getFields();

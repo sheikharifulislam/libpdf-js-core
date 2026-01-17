@@ -150,11 +150,11 @@ When you call `PDF.load()`, the library:
 const pdf = await PDF.load(bytes);
 
 // The catalog is loaded, but page content isn't parsed yet
-const page = await pdf.getPage(0);
+const page = pdf.getPage(0);
 
 // Now page content is loaded on demand
 if (page) {
-  const text = await page.extractText();
+  const text = page.extractText();
 }
 ```
 
@@ -213,7 +213,7 @@ When working with the low-level API, you'll encounter references:
 
 ```typescript
 // Get a page dictionary
-const page = await pdf.getPage(0);
+const page = pdf.getPage(0);
 if (!page) return;
 
 const pageDict = page.dict;
@@ -224,7 +224,7 @@ const contentsRef = pageDict.getRef("Contents");
 
 // Resolve the reference to get the actual object
 if (contentsRef) {
-  const contents = await pdf.context.resolve(contentsRef);
+  const contents = pdf.context.resolve(contentsRef);
 }
 ```
 

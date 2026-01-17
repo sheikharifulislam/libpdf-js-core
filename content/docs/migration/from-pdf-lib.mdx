@@ -14,7 +14,7 @@ LibPDF was designed with API familiarity in mind. If you're coming from pdf-lib,
 | Load PDF           | `PDFDocument.load(bytes)` | `PDF.load(bytes)`                 |
 | Create PDF         | `PDFDocument.create()`    | `PDF.create()`                    |
 | Add page           | `pdfDoc.addPage()`        | `pdf.addPage()`                   |
-| Get page           | `pdfDoc.getPage(0)`       | `await pdf.getPage(0)`            |
+| Get page           | `pdfDoc.getPage(0)`       | `pdf.getPage(0)`                  |
 | Draw text          | `page.drawText()`         | `page.drawText()`                 |
 | Embed font         | `pdfDoc.embedFont()`      | `pdf.embedFont()`                 |
 | Save               | `pdfDoc.save()`           | `pdf.save()`                      |
@@ -72,9 +72,9 @@ const page = pdfDoc.getPage(0);
 const count = pdfDoc.getPageCount();
 
 // LibPDF
-const pages = await pdf.getPages(); // Note: async
-const page = await pdf.getPage(0); // Note: async
-const count = pdf.getPageCount(); // Sync
+const pages = pdf.getPages();
+const page = pdf.getPage(0);
+const count = pdf.getPageCount();
 ```
 
 ### Drawing Text
@@ -112,7 +112,7 @@ const custom = await pdfDoc.embedFont(fontBytes);
 page.drawText("Hello", { font: "Helvetica" });
 
 // Custom fonts
-const custom = await pdf.embedFont(fontBytes);
+const custom = pdf.embedFont(fontBytes);
 page.drawText("Hello", { font: custom });
 ```
 
@@ -158,7 +158,7 @@ page.drawImage(image, {
 });
 
 // LibPDF - auto-detects format
-const image = await pdf.embedImage(imageBytes); // PNG or JPEG
+const image = pdf.embedImage(imageBytes); // PNG or JPEG
 
 page.drawImage(image, {
   x: 50,
@@ -225,15 +225,15 @@ const checkbox = form.getCheckBox("agree");
 checkbox.check();
 
 // LibPDF
-const form = await pdf.getForm();
+const form = pdf.getForm();
 const field = form?.getTextField("name");
-await field?.setValue("John Doe");
+field?.setValue("John Doe");
 
 const checkbox = form?.getCheckbox("agree");
-await checkbox?.check();
+checkbox?.check();
 
 // Bulk fill (new feature)
-await form?.fill({
+form?.fill({
   name: "John Doe",
   email: "john@example.com",
   agree: true,
@@ -270,8 +270,8 @@ pdf.setMetadata({
 // Not available in pdf-lib
 
 // LibPDF
-const page = await pdf.getPage(0);
-const result = await page.extractText();
+const page = pdf.getPage(0);
+const result = page?.extractText();
 
 console.log(result.text); // Plain text
 
@@ -287,13 +287,13 @@ for (const line of result.lines) {
 // Not available in pdf-lib
 
 // LibPDF
-const matches = await page.findText("invoice");
+const matches = page.findText("invoice");
 for (const match of matches) {
   console.log(`Found at:`, match.bbox);
 }
 
 // Regex support
-const placeholders = await page.findText(/\{\{.*?\}\}/g);
+const placeholders = page.findText(/\{\{.*?\}\}/g);
 ```
 
 ### Digital Signatures
@@ -308,7 +308,7 @@ const signer = await P12Signer.create(p12Bytes, "password");
 const result = await pdf.sign({
   signer,
   level: "B-LTA",
-  timestampServer: "http://timestamp.example.com",
+  timestampAuthority,
 });
 ```
 
@@ -364,27 +364,29 @@ const pdf = await PDF.load(bytes, { lenient: false });
 
 ### Async vs Sync
 
-Some operations that were sync in pdf-lib are async in LibPDF:
+Most operations in LibPDF are synchronous:
 
-| Operation    | pdf-lib | LibPDF    |
-| ------------ | ------- | --------- |
-| `getPage(0)` | sync    | **async** |
-| `getPages()` | sync    | **async** |
-| `getForm()`  | sync    | **async** |
-| `create()`   | async   | **sync**  |
-
-This is because LibPDF uses lazy loading for better memory efficiency with large documents.
+| Operation      | pdf-lib | LibPDF   |
+| -------------- | ------- | -------- |
+| `load()`       | async   | async    |
+| `create()`     | async   | **sync** |
+| `getPage(0)`   | sync    | sync     |
+| `getPages()`   | sync    | sync     |
+| `getForm()`    | sync    | sync     |
+| `embedFont()`  | async   | **sync** |
+| `embedImage()` | async   | **sync** |
+| `save()`       | async   | async    |
 
 ### Form Field Mutations
 
-Setting field values is async in LibPDF:
+Setting field values is synchronous in LibPDF:
 
 ```typescript
 // pdf-lib - sync
 field.setText("value");
 
-// LibPDF - async
-await field.setValue("value");
+// LibPDF - also sync
+field.setValue("value");
 ```
 
 ### Standard Fonts
@@ -398,7 +400,7 @@ page.drawText("Hello", { font });
 page.drawText("Hello", { font: "Helvetica" });
 
 // Or embed for custom fonts
-const custom = await pdf.embedFont(customFontBytes);
+const custom = pdf.embedFont(customFontBytes);
 page.drawText("Hello", { font: custom });
 ```
 
@@ -421,15 +423,14 @@ const cyan = cmyk(1, 0, 0, 0);
    - Change `pdf-lib` to `@libpdf/core`
    - `PDFDocument` becomes `PDF`
 
-2. **Add async/await**
-   - `getPage()` and `getPages()` are now async
-   - `getForm()` is now async
-   - Form field mutations are async
+2. **Remove unnecessary async/await**
+   - `PDF.create()` is now sync
+   - `embedFont()` is now sync
+   - `embedImage()` is now sync
 
 3. **Update form field methods**
    - `setText()` becomes `setValue()`
    - `getText()` becomes `getValue()`
-   - Add `await` to mutations
 
 4. **Simplify standard fonts**
    - Remove font embedding for Standard 14 fonts

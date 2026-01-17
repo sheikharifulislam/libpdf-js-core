@@ -156,62 +156,50 @@ try {
 
 ## Async Patterns
 
-### All I/O is Async
+### Loading and Saving are Async
 
-LibPDF uses async/await for all I/O operations:
+LibPDF uses async/await for loading and saving:
 
 ```typescript
 // Loading is async
 const pdf = await PDF.load(bytes);
 
-// Page access is async
-const page = await pdf.getPage(0);
+// Page access is sync
+const page = pdf.getPage(0);
 
-// Text extraction is async
-const text = await page.extractText();
+// Text extraction is sync
+const text = page.extractText();
 
 // Saving is async
 const savedBytes = await pdf.save();
 ```
 
-### Batch Operations
+### Getting Pages
 
-For performance, batch related operations:
+Page access is synchronous:
 
 ```typescript
-// Inefficient: sequential page loading
-const pages: PDFPage[] = [];
-for (let i = 0; i < pdf.getPageCount(); i++) {
-  pages.push(await pdf.getPage(i));
-}
+// Get a single page
+const page = pdf.getPage(0);
 
-// Better: parallel loading
-const pagePromises = [];
-for (let i = 0; i < pdf.getPageCount(); i++) {
-  pagePromises.push(pdf.getPage(i));
-}
-const pages = await Promise.all(pagePromises);
+// Get all pages
+const pages = pdf.getPages();
 
-// Best: use getPages() which is optimized
-const pages = await pdf.getPages();
+// Get page count
+const count = pdf.getPageCount();
 ```
 
-### Streaming Considerations
+### Text Extraction
 
-For large files, consider memory usage:
+Text extraction is synchronous:
 
 ```typescript
-// Process pages one at a time for large documents
-async function extractAllText(pdf: PDF): Promise<string[]> {
+function extractAllText(pdf: PDF): string[] {
   const results: string[] = [];
 
-  for (let i = 0; i < pdf.getPageCount(); i++) {
-    const page = await pdf.getPage(i);
-    if (page) {
-      const text = await page.extractText();
-      results.push(text.text);
-    }
-    // Page can be garbage collected after processing
+  for (const page of pdf.getPages()) {
+    const text = page.extractText();
+    results.push(text.text);
   }
 
   return results;
@@ -227,7 +215,7 @@ For advanced features, access internal APIs.
 Access the raw object storage:
 
 ```typescript
-import { PDF, PdfRef, PdfDict } from "@libpdf/core";
+import { PDF, PdfRef, PdfDict, PdfName } from "@libpdf/core";
 
 const pdf = await PDF.load(bytes);
 
@@ -235,7 +223,7 @@ const pdf = await PDF.load(bytes);
 const registry = pdf.context.registry;
 
 // Resolve any reference
-const obj = await registry.resolve(PdfRef.of(5, 0));
+const obj = registry.resolve(PdfRef.of(5, 0));
 
 // Register new objects
 const newDict = PdfDict.of({ Type: PdfName.of("Custom") });
@@ -418,7 +406,7 @@ Here's a complete example of building on LibPDF:
 
 ```typescript
 // pdf-redactor/index.ts
-import { PDF, PDFPage, rgb, type Color } from "@libpdf/core";
+import { PDF, rgb, type Color } from "@libpdf/core";
 
 export interface RedactionOptions {
   color?: Color;
@@ -447,11 +435,13 @@ export async function redactText(
 
   // Process each page with redactions
   for (const [pageIndex, texts] of byPage) {
-    const page = await pdf.getPage(pageIndex);
-    if (!page) continue;
+    const page = pdf.getPage(pageIndex);
+    if (!page) {
+      continue;
+    }
 
     for (const text of texts) {
-      const matches = await page.findText(text);
+      const matches = page.findText(text);
       for (const match of matches) {
         // Draw a filled rectangle over each match
         page.drawRectangle({
@@ -476,7 +466,7 @@ export async function redactText(
 | Dependencies | Peer dependency for libraries, direct for apps |
 | Types        | Preserve generics, don't upcast                |
 | Errors       | Re-export error types, add context             |
-| Async        | Batch operations, consider memory              |
+| Async        | Only load/save are async; page ops are sync    |
 | Low-level    | Use sparingly, document version requirements   |
 | Testing      | Test with real PDFs, cover error cases         |
 | Bundles      | Import only what you need                      |

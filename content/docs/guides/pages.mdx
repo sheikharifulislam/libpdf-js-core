@@ -12,21 +12,21 @@ This guide covers all operations you can perform on PDF pages.
 ### All Pages
 
 ```ts
-const pages = await pdf.getPages();
+const pages = pdf.getPages();
 console.log(`Document has ${pages.length} pages`);
 ```
 
 ### Single Page (Zero-Indexed)
 
 ```ts
-const firstPage = await pdf.getPage(0);
-const lastPage = await pdf.getPage(pdf.getPageCount() - 1);
+const firstPage = pdf.getPage(0);
+const lastPage = pdf.getPage(pdf.getPageCount() - 1);
 ```
 
 ### Page Properties
 
 ```ts
-const page = await pdf.getPage(0);
+const page = pdf.getPage(0);
 
 // Dimensions in points (1 inch = 72 points)
 const { width, height } = page;
@@ -195,7 +195,7 @@ const backgroundPdf = await PDF.load(backgroundBytes);
 const embeddedPage = await pdf.embedPage(backgroundPdf, 0);
 
 // Draw it on each page
-for (const page of await pdf.getPages()) {
+for (const page of pdf.getPages()) {
   page.drawPage(embeddedPage, {
     x: 0,
     y: 0,

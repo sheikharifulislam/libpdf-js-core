@@ -9,7 +9,7 @@ The `PDFPage` class represents a single page in a PDF document. It provides acce
 
 ```typescript
 const pdf = await PDF.load(bytes);
-const page = await pdf.getPage(0);
+const page = pdf.getPage(0);
 if (!page) throw new Error("Page not found");
 
 console.log(`Size: ${page.width} x ${page.height}`);
@@ -98,7 +98,7 @@ Whether the page is in portrait orientation.
 
 ## Page Boxes
 
-PDF pages have multiple "boxes" defining different regions. Each returns a `Rectangle` with `{ x1, y1, x2, y2 }` coordinates.
+PDF pages have multiple "boxes" defining different regions. Each returns a `Rectangle` with `{ x, y, width, height }` properties.
 
 ### getMediaBox()
 
@@ -185,7 +185,7 @@ page.drawText("Hello, World!", {
 });
 
 // With embedded font
-const font = await pdf.embedFont(fontBytes);
+const font = pdf.embedFont(fontBytes);
 page.drawText("Custom Font", {
   x: 50,
   y: 650,
@@ -378,7 +378,7 @@ Draw an image on the page.
 If only `width` or `height` is specified, aspect ratio is preserved.
 
 ```typescript
-const image = await pdf.embedImage(jpegBytes);
+const image = pdf.embedImage(jpegBytes);
 
 // Draw at natural size
 page.drawImage(image, { x: 50, y: 500 });
@@ -503,7 +503,7 @@ Draw a form field widget on this page.
 
 ```typescript
 // Text field
-await page.drawField(nameField, {
+page.drawField(nameField, {
   x: 100,
   y: 700,
   width: 200,
@@ -511,7 +511,7 @@ await page.drawField(nameField, {
 });
 
 // Checkbox
-await page.drawField(agreeCheckbox, {
+page.drawField(agreeCheckbox, {
   x: 100,
   y: 650,
   width: 18,
@@ -519,14 +519,14 @@ await page.drawField(agreeCheckbox, {
 });
 
 // Radio group - each option needs its own widget
-await page.drawField(paymentRadio, {
+page.drawField(paymentRadio, {
   x: 100,
   y: 550,
   width: 16,
   height: 16,
   option: "Credit Card",
 });
-await page.drawField(paymentRadio, {
+page.drawField(paymentRadio, {
   x: 100,
   y: 520,
   width: 16,
@@ -551,11 +551,11 @@ page.addHighlightAnnotation({
 });
 
 // Get all annotations
-const annotations = await page.getAnnotations();
+const annotations = page.getAnnotations();
 
 // Get specific types
-const highlights = await page.getHighlightAnnotations();
-const links = await page.getLinkAnnotations();
+const highlights = page.getHighlightAnnotations();
+const links = page.getLinkAnnotations();
 ```
 
 ---
@@ -570,10 +570,10 @@ Extract all text content from the page.
 | ----------- | -------------------- | ------------------ |
 | `[options]` | `ExtractTextOptions` | Extraction options |
 
-**Returns**: `Promise<PageText>`
+**Returns**: `PageText`
 
 ```typescript
-const pageText = await page.extractText();
+const pageText = page.extractText();
 console.log(pageText.text); // Plain text
 
 // Access structured content
@@ -613,17 +613,17 @@ Search for text on the page.
 | `[options.caseSensitive]` | `boolean`          | Case-sensitive matching |
 | `[options.wholeWord]`     | `boolean`          | Match whole words only  |
 
-**Returns**: `Promise<TextMatch[]>`
+**Returns**: `TextMatch[]`
 
 ```typescript
 // String search
-const matches = await page.findText("invoice");
+const matches = page.findText("invoice");
 for (const match of matches) {
   console.log(`Found at:`, match.bbox);
 }
 
 // Regex search
-const placeholders = await page.findText(/\{\{\s*\w+\s*\}\}/g);
+const placeholders = page.findText(/\{\{\s*\w+\s*\}\}/g);
 ```
 
 **TextMatch Structure**:
@@ -644,10 +644,10 @@ interface TextMatch {
 
 ```typescript
 interface Rectangle {
-  x1: number; // Left
-  y1: number; // Bottom
-  x2: number; // Right
-  y2: number; // Top
+  x: number; // Left x coordinate
+  y: number; // Bottom y coordinate
+  width: number; // Width
+  height: number; // Height
 }
 ```
 

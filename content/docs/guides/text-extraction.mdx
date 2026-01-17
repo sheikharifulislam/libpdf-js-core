@@ -12,8 +12,8 @@ This guide covers extracting text from PDF pages, including position information
 Get all text from a page as a single string:
 
 ```ts
-const page = await pdf.getPage(0);
-const { text } = await page.extractText();
+const page = pdf.getPage(0);
+const { text } = page.extractText();
 
 console.log(text);
 ```
@@ -25,8 +25,8 @@ The text is extracted in reading order (top-to-bottom, left-to-right for LTR lan
 ```ts
 const allText: string[] = [];
 
-for (const page of await pdf.getPages()) {
-  const { text } = await page.extractText();
+for (const page of pdf.getPages()) {
+  const { text } = page.extractText();
   allText.push(text);
 }
 
@@ -38,7 +38,7 @@ const fullDocument = allText.join("\n\n");
 Get detailed information about each text span:
 
 ```ts
-const { lines } = await page.extractText();
+const { lines } = page.extractText();
 
 for (const line of lines) {
   for (const span of line.spans) {
@@ -79,7 +79,7 @@ Find text matching a pattern:
 ### String Search
 
 ```ts
-const results = await page.findText("invoice");
+const results = page.findText("invoice");
 
 for (const match of results) {
   console.log(`Found at:`, match.bbox);
@@ -90,13 +90,13 @@ for (const match of results) {
 
 ```ts
 // Find invoice numbers
-const invoices = await page.findText(/INV-\d{6}/g);
+const invoices = page.findText(/INV-\d{6}/g);
 
 // Find email addresses
-const emails = await page.findText(/[\w.-]+@[\w.-]+\.\w+/g);
+const emails = page.findText(/[\w.-]+@[\w.-]+\.\w+/g);
 
 // Case-insensitive
-const terms = await page.findText(/important/gi);
+const terms = page.findText(/important/gi);
 ```
 
 ### Search Results
@@ -120,18 +120,18 @@ interface TextMatch {
 ## Search Entire Document
 
 ```ts
-async function searchDocument(pdf: PDF, pattern: string | RegExp) {
+function searchDocument(pdf: PDF, pattern: string | RegExp) {
   const results: TextMatch[] = [];
 
-  for (const page of await pdf.getPages()) {
-    const pageResults = await page.findText(pattern);
+  for (const page of pdf.getPages()) {
+    const pageResults = page.findText(pattern);
     results.push(...pageResults);
   }
 
   return results;
 }
 
-const allMatches = await searchDocument(pdf, /confidential/gi);
+const allMatches = searchDocument(pdf, /confidential/gi);
 console.log(`Found ${allMatches.length} matches`);
 ```
 
@@ -140,7 +140,7 @@ console.log(`Found ${allMatches.length} matches`);
 Extract text from a specific area of the page:
 
 ```ts
-const { lines } = await page.extractText();
+const { lines } = page.extractText();
 
 // Define region (in points from bottom-left)
 const region = { x: 50, y: 700, width: 200, height: 50 };
@@ -161,7 +161,7 @@ const regionText = inRegion.map(line => line.text).join(" ");
 Text is automatically grouped into lines. Each line contains spans with the same baseline:
 
 ```ts
-const { lines } = await page.extractText();
+const { lines } = page.extractText();
 
 // Lines are already sorted top-to-bottom
 for (const line of lines) {
@@ -179,7 +179,7 @@ for (const line of lines) {
 Most modern PDFs include ToUnicode maps for proper text extraction. For older PDFs:
 
 ```ts
-const { text } = await page.extractText();
+const { text } = page.extractText();
 
 // Check for extraction issues
 if (text.includes("\uFFFD") || text.length === 0) {
@@ -204,11 +204,11 @@ For large documents:
 ```ts
 // Process pages one at a time to limit memory
 for (let i = 0; i < pdf.getPageCount(); i++) {
-  const page = await pdf.getPage(i);
-  const { text } = await page.extractText();
+  const page = pdf.getPage(i);
+  const { text } = page.extractText();
 
   // Process text immediately
-  await processPageText(i, text);
+  processPageText(i, text);
 
   // Text data can now be garbage collected
 }

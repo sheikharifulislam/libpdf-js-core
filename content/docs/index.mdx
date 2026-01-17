@@ -31,8 +31,8 @@ import { PDF } from "@libpdf/core";
 const pdf = await PDF.load(bytes);
 console.log(`${pdf.getPageCount()} pages`);
 
-const page = await pdf.getPage(0);
-const text = await page.extractText();
+const page = pdf.getPage(0);
+const text = page.extractText();
 ```
 
 ## Features

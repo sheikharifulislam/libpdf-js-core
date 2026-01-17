@@ -9,10 +9,10 @@ The `PDFForm` class manages interactive forms (AcroForms) in a PDF document. It 
 
 ```typescript
 const pdf = await PDF.load(bytes);
-const form = await pdf.getForm();
+const form = pdf.getForm();
 
 if (form) {
-  await form.fill({
+  form.fill({
     name: "John Doe",
     email: "john@example.com",
     agree: true,
@@ -138,7 +138,7 @@ Get a text field by name.
 ```typescript
 const nameField = form.getTextField("name");
 if (nameField) {
-  await nameField.setValue("John Doe");
+  nameField.setValue("John Doe");
   console.log(nameField.getValue());
 }
 ```
@@ -154,7 +154,7 @@ Get a checkbox field by name.
 ```typescript
 const agree = form.getCheckbox("terms");
 if (agree) {
-  await agree.check();
+  agree.check();
   console.log(agree.isChecked()); // true
 }
 ```
@@ -170,7 +170,7 @@ Get a radio button group by name.
 ```typescript
 const payment = form.getRadioGroup("payment_method");
 if (payment) {
-  await payment.setValue("credit_card");
+  payment.setValue("credit_card");
   console.log(payment.getOptions()); // ["credit_card", "paypal", "bank"]
 }
 ```
@@ -186,7 +186,7 @@ Get a dropdown (combo box) field by name.
 ```typescript
 const country = form.getDropdown("country");
 if (country) {
-  await country.setValue("United States");
+  country.setValue("United States");
   const options = country.getOptions();
   // options: [{ value: "USA", display: "United States" }, ...]
 }
@@ -203,7 +203,7 @@ Get a list box field by name.
 ```typescript
 const colors = form.getListBox("favorite_colors");
 if (colors) {
-  await colors.setValue(["red", "blue"]);
+  colors.setValue(["red", "blue"]);
 }
 ```
 
@@ -300,14 +300,14 @@ Fill multiple fields at once.
 | -------- | ---------------------------- | --------------------- |
 | `values` | `Record<string, FieldValue>` | Field names to values |
 
-**Returns**: `Promise<{ filled: string[], skipped: string[] }>`
+**Returns**: `{ filled: string[], skipped: string[] }`
 
 **Throws**: `TypeError` - If a value type doesn't match the field type
 
 This method is **lenient**: fields that don't exist are silently skipped.
 
 ```typescript
-const result = await form.fill({
+const result = form.fill({
   name: "John Doe",
   email: "john@example.com",
   agree: true, // checkbox
@@ -337,7 +337,7 @@ console.log(result.skipped); // ["nonexistent"]
 Reset all fields to their default values.
 
 ```typescript
-await form.resetAll();
+form.resetAll();
 ```
 
 ---
@@ -377,7 +377,7 @@ const nameField = form.createTextField("name", {
 });
 
 // Place on page
-await page.drawField(nameField, {
+page.drawField(nameField, {
   x: 100,
   y: 700,
   width: 200,
@@ -413,7 +413,7 @@ const agree = form.createCheckbox("agree", {
   defaultChecked: true,
 });
 
-await page.drawField(agree, {
+page.drawField(agree, {
   x: 100,
   y: 650,
   width: 18,
@@ -454,21 +454,21 @@ const payment = form.createRadioGroup("payment", {
 });
 
 // Each option needs its own widget
-await page.drawField(payment, {
+page.drawField(payment, {
   x: 100,
   y: 550,
   width: 16,
   height: 16,
   option: "Credit Card",
 });
-await page.drawField(payment, {
+page.drawField(payment, {
   x: 100,
   y: 520,
   width: 16,
   height: 16,
   option: "PayPal",
 });
-await page.drawField(payment, {
+page.drawField(payment, {
   x: 100,
   y: 490,
   width: 16,
@@ -507,7 +507,7 @@ const country = form.createDropdown("country", {
   fontSize: 11,
 });
 
-await page.drawField(country, {
+page.drawField(country, {
   x: 100,
   y: 600,
   width: 200,
@@ -545,7 +545,7 @@ const colors = form.createListbox("colors", {
   defaultValue: ["Red", "Blue"],
 });
 
-await page.drawField(colors, {
+page.drawField(colors, {
   x: 100,
   y: 400,
   width: 150,
@@ -583,7 +583,7 @@ const sigField = form.createSignatureField("Signature1");
 Regenerate appearance streams for all modified fields.
 
 ```typescript
-await form.updateAppearances();
+form.updateAppearances();
 ```
 
 ---
@@ -603,8 +603,8 @@ After flattening:
 - The form can no longer be edited
 
 ```typescript
-await form.fill({ name: "John", email: "john@example.com" });
-await form.flatten();
+form.fill({ name: "John", email: "john@example.com" });
+form.flatten();
 const bytes = await pdf.save();
 ```
 
@@ -617,7 +617,7 @@ Reload fields from the underlying AcroForm.
 Call this if the form structure has been modified externally.
 
 ```typescript
-await form.reloadFields();
+form.reloadFields();
 ```
 
 ---
@@ -639,27 +639,27 @@ console.log(acroForm.defaultAppearance);
 
 ### TextField
 
-| Method/Property         | Returns         | Description               |
-| ----------------------- | --------------- | ------------------------- |
-| `getValue()`            | `string`        | Get current value         |
-| `setValue(value)`       | `Promise<void>` | Set value                 |
-| `maxLength`             | `number`        | Max length (0 = no limit) |
-| `isMultiline`           | `boolean`       | Whether multiline         |
-| `setFont(font)`         | `void`          | Set font                  |
-| `setFontSize(size)`     | `void`          | Set font size             |
-| `setTextColor(r, g, b)` | `void`          | Set text color            |
+| Method/Property         | Returns   | Description               |
+| ----------------------- | --------- | ------------------------- |
+| `getValue()`            | `string`  | Get current value         |
+| `setValue(value)`       | `void`    | Set value                 |
+| `maxLength`             | `number`  | Max length (0 = no limit) |
+| `isMultiline`           | `boolean` | Whether multiline         |
+| `setFont(font)`         | `void`    | Set font                  |
+| `setFontSize(size)`     | `void`    | Set font size             |
+| `setTextColor(r, g, b)` | `void`    | Set text color            |
 
 ---
 
 ### CheckboxField
 
-| Method            | Returns         | Description         |
-| ----------------- | --------------- | ------------------- |
-| `isChecked()`     | `boolean`       | Check state         |
-| `check()`         | `Promise<void>` | Check the box       |
-| `uncheck()`       | `Promise<void>` | Uncheck the box     |
-| `setValue(value)` | `Promise<void>` | Set by value string |
-| `getOnValue()`    | `string`        | Get the "on" value  |
+| Method            | Returns   | Description         |
+| ----------------- | --------- | ------------------- |
+| `isChecked()`     | `boolean` | Check state         |
+| `check()`         | `void`    | Check the box       |
+| `uncheck()`       | `void`    | Uncheck the box     |
+| `setValue(value)` | `void`    | Set by value string |
+| `getOnValue()`    | `string`  | Get the "on" value  |
 
 ---
 
@@ -668,7 +668,7 @@ console.log(acroForm.defaultAppearance);
 | Method            | Returns          | Description           |
 | ----------------- | ---------------- | --------------------- |
 | `getValue()`      | `string \| null` | Get selected option   |
-| `setValue(value)` | `Promise<void>`  | Select option         |
+| `setValue(value)` | `void`           | Select option         |
 | `getOptions()`    | `string[]`       | Get available options |
 
 ---
@@ -678,7 +678,7 @@ console.log(acroForm.defaultAppearance);
 | Method/Property     | Returns          | Description           |
 | ------------------- | ---------------- | --------------------- |
 | `getValue()`        | `string`         | Get selected value    |
-| `setValue(value)`   | `Promise<void>`  | Select value          |
+| `setValue(value)`   | `void`           | Select value          |
 | `getOptions()`      | `ChoiceOption[]` | Get available options |
 | `isEditable`        | `boolean`        | Whether editable      |
 | `setFont(font)`     | `void`           | Set font              |
@@ -691,7 +691,7 @@ console.log(acroForm.defaultAppearance);
 | Method/Property     | Returns          | Description           |
 | ------------------- | ---------------- | --------------------- |
 | `getValue()`        | `string[]`       | Get selected values   |
-| `setValue(values)`  | `Promise<void>`  | Set selected values   |
+| `setValue(values)`  | `void`           | Set selected values   |
 | `getOptions()`      | `ChoiceOption[]` | Get available options |
 | `isMultiSelect`     | `boolean`        | Whether multi-select  |
 | `setFont(font)`     | `void`           | Set font              |

@@ -10,7 +10,7 @@ This guide covers reading and filling AcroForm fields in PDFs.
 ## Check for Forms
 
 ```ts
-const form = await pdf.getForm();
+const form = pdf.getForm();
 
 if (form && !form.isEmpty) {
   console.log("This PDF has form fields");
@@ -22,7 +22,7 @@ if (form && !form.isEmpty) {
 ## List All Fields
 
 ```ts
-const form = await pdf.getForm();
+const form = pdf.getForm();
 if (!form) return;
 
 const fields = form.getFields();
@@ -52,10 +52,10 @@ Field types:
 Fill multiple fields at once using field names:
 
 ```ts
-const form = await pdf.getForm();
+const form = pdf.getForm();
 if (!form) return;
 
-await form.fill({
+form.fill({
   "First Name": "John",
   "Last Name": "Doe",
   Email: "john@example.com",
@@ -71,24 +71,24 @@ await pdf.save();
 For more control, fill fields individually:
 
 ```ts
-const form = await pdf.getForm();
+const form = pdf.getForm();
 if (!form) return;
 
 // Text field
 const nameField = form.getTextField("First Name");
-await nameField?.setValue("John");
+nameField?.setValue("John");
 
 // Checkbox
 const termsField = form.getCheckbox("Agree to Terms");
-await termsField?.check();
+termsField?.check();
 
 // Radio button
 const genderField = form.getRadioGroup("Gender");
-await genderField?.setValue("Male");
+genderField?.setValue("Male");
 
 // Dropdown
 const countryField = form.getDropdown("Country");
-await countryField?.setValue("United States");
+countryField?.setValue("United States");
 ```
 
 ## Field Types
@@ -103,13 +103,13 @@ if (!field) return;
 const currentValue = field.getValue();
 
 // Set value
-await field.setValue("John Doe");
+field.setValue("John Doe");
 
 // Multi-line text
-await field.setValue("Line 1\nLine 2\nLine 3");
+field.setValue("Line 1\nLine 2\nLine 3");
 
 // Clear
-await field.setValue("");
+field.setValue("");
 ```
 
 ### Checkboxes
@@ -122,8 +122,8 @@ if (!field) return;
 const isChecked = field.isChecked();
 
 // Set state
-await field.check();
-await field.uncheck();
+field.check();
+field.uncheck();
 ```
 
 ### Radio Buttons
@@ -142,10 +142,10 @@ console.log(options); // ["Credit Card", "PayPal", "Bank Transfer"]
 const selected = field.getValue();
 
 // Select an option
-await field.setValue("PayPal");
+field.setValue("PayPal");
 
 // Clear selection (if allowed)
-await field.setValue(null);
+field.setValue(null);
 ```
 
 ### Dropdowns (Comboboxes)
@@ -161,11 +161,11 @@ const options = field.getOptions();
 const selected = field.getValue();
 
 // Select by value
-await field.setValue("US");
+field.setValue("US");
 
 // For editable dropdowns, set custom value
 if (field.isEditable) {
-  await field.setValue("Custom Value");
+  field.setValue("Custom Value");
 }
 ```
 
@@ -182,11 +182,11 @@ const options = field.getOptions();
 const selected = field.getValue(); // string[]
 
 // Select single value
-await field.setValue(["Technology"]);
+field.setValue(["Technology"]);
 
 // Select multiple (if allowed)
 if (field.isMultiSelect) {
-  await field.setValue(["Technology", "Science", "Art"]);
+  field.setValue(["Technology", "Science", "Art"]);
 }
 ```
 
@@ -232,17 +232,17 @@ if (field?.isRequired()) {
 Flattening converts form fields to static content. The form data becomes part of the page content and can no longer be edited.
 
 ```ts
-const form = await pdf.getForm();
+const form = pdf.getForm();
 if (!form) return;
 
 // Fill first
-await form.fill({
+form.fill({
   Name: "John Doe",
   Date: "2024-01-15",
 });
 
 // Then flatten
-await form.flatten();
+form.flatten();
 
 await pdf.save();
 ```
@@ -257,12 +257,12 @@ To use custom fonts in text fields:
 
 ```ts
 const fontBytes = await readFile("fonts/OpenSans-Regular.ttf");
-const font = await pdf.embedFont(fontBytes);
+const font = pdf.embedFont(fontBytes);
 
 const field = form.getTextField("Name");
 if (field) {
   field.setFont(font);
-  await field.setValue("John Doe");
+  field.setValue("John Doe");
 }
 ```
 
@@ -276,7 +276,7 @@ import { PDF } from "@libpdf/core";
 const bytes = await readFile("application-form.pdf");
 const pdf = await PDF.load(bytes);
 
-const form = await pdf.getForm();
+const form = pdf.getForm();
 if (!form) {
   console.log("No form found");
   return;
@@ -289,7 +289,7 @@ for (const field of form.getFields()) {
 }
 
 // Fill the form
-await form.fill({
+form.fill({
   applicant_name: "Jane Smith",
   applicant_email: "jane@example.com",
   application_date: new Date().toISOString().split("T")[0],
@@ -301,7 +301,7 @@ await form.fill({
 await writeFile("filled-form.pdf", await pdf.save());
 
 // Or flatten and save
-await form.flatten();
+form.flatten();
 await writeFile("flattened-form.pdf", await pdf.save());
 ```
 

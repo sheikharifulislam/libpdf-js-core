@@ -161,10 +161,10 @@ Get a single page by index (0-based).
 | ------- | -------- | -------------------- |
 | `index` | `number` | Page index (0-based) |
 
-**Returns**: `Promise<PDFPage | null>`
+**Returns**: `PDFPage | null`
 
 ```typescript
-const page = await pdf.getPage(0);
+const page = pdf.getPage(0);
 if (page) {
   console.log(`Size: ${page.width} x ${page.height}`);
 }
@@ -176,10 +176,10 @@ if (page) {
 
 Get all pages in document order.
 
-**Returns**: `Promise<PDFPage[]>`
+**Returns**: `PDFPage[]`
 
 ```typescript
-const pages = await pdf.getPages();
+const pages = pdf.getPages();
 for (const page of pages) {
   console.log(`Page ${page.index}: ${page.width} x ${page.height}`);
 }
@@ -329,7 +329,7 @@ const watermark = await PDF.load(watermarkBytes);
 const embedded = await pdf.embedPage(watermark, 0);
 
 // Draw on all pages
-for (const page of await pdf.getPages()) {
+for (const page of pdf.getPages()) {
   page.drawPage(embedded, { opacity: 0.5 });
 }
 ```
@@ -342,10 +342,10 @@ for (const page of await pdf.getPages()) {
 
 Get the interactive form, if present.
 
-**Returns**: `Promise<PDFForm | null>`
+**Returns**: `PDFForm | null`
 
 ```typescript
-const form = await pdf.getForm();
+const form = pdf.getForm();
 if (form) {
   const fields = form.getFields();
   console.log(`${fields.length} fields found`);
@@ -631,10 +631,10 @@ Embed an image for use in drawing operations.
 | ------- | ------------ | ----------------------- |
 | `bytes` | `Uint8Array` | JPEG or PNG image bytes |
 
-**Returns**: `Promise<PDFImage>`
+**Returns**: `PDFImage`
 
 ```typescript
-const image = await pdf.embedImage(jpegBytes);
+const image = pdf.embedImage(jpegBytes);
 
 page.drawImage(image, {
   x: 50,

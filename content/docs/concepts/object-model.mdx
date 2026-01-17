@@ -31,7 +31,7 @@ PDF defines eight primitive types plus references:
 Dictionaries are key-value maps, the most common structure in PDFs. Every page, font, and image is a dictionary.
 
 ```typescript
-import { PdfDict, PdfName, PdfNumber, PdfString } from "@libpdf/core";
+import { PdfArray, PdfDict, PdfName, PdfNumber, PdfString } from "@libpdf/core";
 
 // Create a dictionary
 const dict = PdfDict.of({
@@ -112,7 +112,7 @@ const same = PdfRef.of(5, 0);
 ref === same; // true (same instance due to interning)
 
 // Resolve a reference to get the actual object
-const obj = await pdf.context.resolve(ref);
+const obj = pdf.context.resolve(ref);
 ```
 
 ### PdfName
@@ -152,7 +152,7 @@ const str2 = PdfString.fromBytes(bytes);
 str.asString(); // "Hello, World!"
 
 // Get raw bytes
-str.toBytes(writer); // ByteWriter
+str.bytes; // Uint8Array
 ```
 
 ### PdfNumber
@@ -174,7 +174,7 @@ real.value; // 3.14159
 Streams combine a dictionary with binary data (used for page content, images, fonts):
 
 ```typescript
-import { PdfStream, PdfDict, PdfName, PdfNumber } from "@libpdf/core";
+import { PdfStream, PdfName, PdfNumber } from "@libpdf/core";
 
 // Create a stream
 const stream = PdfStream.fromDict(
@@ -187,11 +187,11 @@ const stream = PdfStream.fromDict(
   imageBytes,
 );
 
-// Access the dictionary
-const dict = stream.dict;
+// Access dictionary entries (PdfStream extends PdfDict)
+const width = stream.getNumber("Width");
 
 // Get decoded data (decompresses if filtered)
-const data = await stream.getDecodedData();
+const data = stream.getDecodedData();
 
 // Get raw (possibly compressed) data
 const raw = stream.data;
@@ -219,15 +219,15 @@ The `5 0` is the object number and generation. Other objects reference this as `
 
 ```typescript
 // Page dictionaries contain references
-const page = await pdf.getPage(0);
-const contentsRef = page.dict.getRef("Contents");
+const page = pdf.getPage(0);
+const contentsRef = page?.dict.getRef("Contents");
 
 if (contentsRef) {
   // Resolve to get the actual stream
-  const contents = await pdf.context.resolve(contentsRef);
+  const contents = pdf.context.resolve(contentsRef);
 
   if (contents instanceof PdfStream) {
-    const data = await contents.getDecodedData();
+    const data = contents.getDecodedData();
     console.log(new TextDecoder().decode(data));
   }
 }
@@ -274,12 +274,12 @@ if (obj instanceof PdfArray) {
 
 if (obj instanceof PdfStream) {
   // It's a stream (has binary data)
-  const data = await obj.getDecodedData();
+  const data = obj.getDecodedData();
 }
 
 if (obj instanceof PdfRef) {
   // It's a reference (needs resolving)
-  const resolved = await pdf.context.resolve(obj);
+  const resolved = pdf.context.resolve(obj);
 }
 
 // Use the type property
@@ -346,7 +346,7 @@ const pdf = await PDF.load(bytes);
 const registry = pdf.context.registry;
 
 // Resolve any reference
-const obj = await registry.resolve(PdfRef.of(5, 0));
+const obj = registry.resolve(PdfRef.of(5, 0));
 
 // Get object synchronously (if already loaded)
 const cached = registry.getObject(PdfRef.of(5, 0));

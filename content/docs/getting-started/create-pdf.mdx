@@ -150,7 +150,7 @@ page.drawLine({
 
 ```ts
 const jpegBytes = await readFile("photo.jpg");
-const image = await pdf.embedJpeg(jpegBytes);
+const image = pdf.embedJpeg(jpegBytes);
 
 page.drawImage(image, {
   x: 50,
@@ -164,7 +164,7 @@ page.drawImage(image, {
 
 ```ts
 const pngBytes = await readFile("logo.png");
-const image = await pdf.embedPng(pngBytes);
+const image = pdf.embedPng(pngBytes);
 
 page.drawImage(image, {
   x: 300,

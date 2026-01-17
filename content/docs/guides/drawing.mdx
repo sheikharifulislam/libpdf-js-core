@@ -217,7 +217,7 @@ page.drawLine({
 ```ts
 // JPEG
 const jpegBytes = await readFile("photo.jpg");
-const jpegImage = await pdf.embedJpeg(jpegBytes);
+const jpegImage = pdf.embedJpeg(jpegBytes);
 
 page.drawImage(jpegImage, {
   x: 50,
@@ -228,7 +228,7 @@ page.drawImage(jpegImage, {
 
 // PNG (with transparency support)
 const pngBytes = await readFile("logo.png");
-const pngImage = await pdf.embedPng(pngBytes);
+const pngImage = pdf.embedPng(pngBytes);
 
 page.drawImage(pngImage, {
   x: 300,
@@ -331,7 +331,7 @@ page.drawText("On top of background", {
 
 ```ts
 const pdf = await PDF.load(existingBytes);
-const page = await pdf.getPage(0);
+const page = pdf.getPage(0);
 
 // Add watermark
 page.drawText("CONFIDENTIAL", {

@@ -66,9 +66,9 @@ Digital signatures cover specific byte ranges. If you rewrite the file, those by
 const pdf = await PDF.load(signedPdfBytes);
 
 // Make allowed changes (form filling, annotations)
-const form = await pdf.getForm();
+const form = pdf.getForm();
 if (form) {
-  await form.fill({ name: "John Doe" });
+  form.fill({ name: "John Doe" });
 }
 
 // MUST use incremental to preserve signatures
@@ -259,7 +259,7 @@ An incremental save:
 
 ```typescript
 const pdf = await PDF.load(bytes);
-const form = await pdf.getForm();
+const form = pdf.getForm();
 const sigFields = form?.getSignatureFields() ?? [];
 
 const hasSignatures = sigFields.some(f => f.isSigned());
@@ -295,7 +295,7 @@ async function savePdf(pdf: PDF, options: { preserveSignatures: boolean }) {
 const pdf = await PDF.load(bytes);
 
 // Check if signatures exist
-const form = await pdf.getForm();
+const form = pdf.getForm();
 const hasSigs = form?.getSignatureFields().some(f => f.isSigned());
 
 if (hasSigs) {

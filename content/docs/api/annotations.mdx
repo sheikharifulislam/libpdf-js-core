@@ -15,7 +15,7 @@ PDF annotations add interactive and visual elements to pages - highlights, stick
 ```typescript
 import { PDF, rgb } from "@libpdf/core";
 
-const pdf = await PDF.create();
+const pdf = PDF.create();
 const page = pdf.addPage();
 
 // Add a yellow highlight
@@ -40,18 +40,18 @@ const bytes = await pdf.save();
 
 ```typescript
 const pdf = await PDF.load(existingBytes);
-const page = await pdf.getPage(0);
+const page = pdf.getPage(0);
 
 // Get all annotations
-const annotations = await page.getAnnotations();
+const annotations = page.getAnnotations();
 
 for (const annot of annotations) {
   console.log(annot.type, annot.contents);
 }
 
 // Get specific types
-const highlights = await page.getHighlightAnnotations();
-const links = await page.getLinkAnnotations();
+const highlights = page.getHighlightAnnotations();
+const links = page.getLinkAnnotations();
 ```
 
 ---
@@ -356,7 +356,7 @@ page.addInkAnnotation({
 ## Modifying Annotations
 
 ```typescript
-const highlights = await page.getHighlightAnnotations();
+const highlights = page.getHighlightAnnotations();
 const highlight = highlights[0];
 
 // Update properties
@@ -375,8 +375,8 @@ highlight.setPrintable(true);
 Remove a specific annotation.
 
 ```typescript
-const highlights = await page.getHighlightAnnotations();
-await page.removeAnnotation(highlights[0]);
+const highlights = page.getHighlightAnnotations();
+page.removeAnnotation(highlights[0]);
 ```
 
 ---
@@ -391,10 +391,10 @@ Remove annotations, optionally filtered by type.
 
 ```typescript
 // Remove all highlights
-await page.removeAnnotations({ type: "Highlight" });
+page.removeAnnotations({ type: "Highlight" });
 
 // Remove all annotations
-await page.removeAnnotations();
+page.removeAnnotations();
 ```
 
 ---
