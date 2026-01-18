@@ -375,6 +375,69 @@ describe("PDF", () => {
       expect(appendedSection).toContain("trailer");
       expect(appendedSection).toContain("/ID");
     });
+
+    it("generates /ID if document lacks one (new document)", async () => {
+      // Create a new document which won't have an /ID
+      const pdf = PDF.create();
+
+      pdf.addPage();
+
+      // Full save should generate an /ID
+      const saved = await pdf.save();
+      const text = new TextDecoder().decode(saved);
+
+      // The trailer should include a generated /ID array
+      expect(text).toContain("/ID");
+
+      // Verify the ID format: should be two identical 16-byte hex strings
+      const idMatch = text.match(/\/ID\s*\[\s*<([a-fA-F0-9]+)>\s*<([a-fA-F0-9]+)>/);
+
+      expect(idMatch).not.toBeNull();
+
+      const [, id1, id2] = idMatch!;
+
+      // Both IDs should be 32 hex chars (16 bytes)
+      expect(id1.length).toBe(32);
+      expect(id2.length).toBe(32);
+      // Both values should be identical for a newly generated ID
+      expect(id1).toBe(id2);
+    });
+
+    it("generates /ID if document lacks one (loaded PDF)", async () => {
+      // pdf-overlay-page-1.pdf is a real PDF without an /ID
+      const bytes = await loadFixture("scenarios", "pdf-overlay-page-1.pdf");
+      const originalText = new TextDecoder().decode(bytes);
+
+      // Verify the original document lacks an /ID
+      expect(originalText).not.toContain("/ID");
+
+      const pdf = await PDF.load(bytes);
+
+      // Modify to trigger a save
+      const catalog = pdf.getCatalog();
+
+      catalog?.set("ModDate", PdfString.fromString("D:20240101"));
+
+      // Save should generate an /ID
+      const saved = await pdf.save();
+      const text = new TextDecoder().decode(saved);
+
+      // The trailer should include a generated /ID array
+      expect(text).toContain("/ID");
+
+      // Verify the ID format: should be two identical 16-byte hex strings
+      const idMatch = text.match(/\/ID\s*\[\s*<([a-fA-F0-9]+)>\s*<([a-fA-F0-9]+)>/);
+
+      expect(idMatch).not.toBeNull();
+
+      const [, id1, id2] = idMatch!;
+
+      // Both IDs should be 32 hex chars (16 bytes)
+      expect(id1.length).toBe(32);
+      expect(id2.length).toBe(32);
+      // Both values should be identical for a newly generated ID
+      expect(id1).toBe(id2);
+    });
   });
 
   describe("copyPagesFrom", () => {
