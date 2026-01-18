@@ -5,6 +5,7 @@
  */
 
 import * as pkijs from "pkijs";
+import { createCMSECDSASignature } from "pkijs";
 
 import type { DigestAlgorithm, KeyType, SignatureAlgorithm, Signer } from "../types";
 
@@ -87,6 +88,11 @@ export class CryptoKeySigner implements Signer {
     }
 
     const signature = await cryptoEngine.sign(signAlgorithm, this.privateKey, new Uint8Array(data));
+
+    // WebCrypto ECDSA returns P1363 format (r || s), but CMS requires DER format
+    if (this.signatureAlgorithm === "ECDSA") {
+      return new Uint8Array(createCMSECDSASignature(signature));
+    }
 
     return new Uint8Array(signature);
   }

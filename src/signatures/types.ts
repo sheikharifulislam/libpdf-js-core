@@ -66,18 +66,22 @@ export interface Signer {
   readonly signatureAlgorithm: SignatureAlgorithm;
 
   /**
-   * Sign data and return raw signature bytes.
+   * Sign data and return signature bytes.
    *
    * The signer is responsible for hashing the data using the specified algorithm
    * before creating the signature. For WebCrypto-based implementations, this is
    * handled automatically by the sign() function.
    *
-   * For RSA: PKCS#1 v1.5 or PSS signature
-   * For ECDSA: DER-encoded (r, s) pair
+   * Signature format requirements:
+   * - RSA: PKCS#1 v1.5 or PSS signature bytes
+   * - ECDSA: DER-encoded SEQUENCE { INTEGER r, INTEGER s }
+   *
+   * Note: WebCrypto returns ECDSA signatures in P1363 format (r || s concatenated).
+   * Use pkijs.createCMSECDSASignature() to convert to DER format.
    *
    * @param data - The data to sign (will be hashed internally)
    * @param algorithm - The digest algorithm to use for hashing
-   * @returns Raw signature bytes
+   * @returns Signature bytes in the format required by CMS/PKCS#7
    */
   sign(data: Uint8Array, algorithm: DigestAlgorithm): Promise<Uint8Array>;
 }

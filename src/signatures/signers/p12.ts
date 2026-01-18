@@ -6,6 +6,7 @@
 
 import { fromBER } from "asn1js";
 import * as pkijs from "pkijs";
+import { createCMSECDSASignature } from "pkijs";
 
 import { toArrayBuffer } from "../../helpers/buffer";
 import { buildCertificateChain } from "../aia";
@@ -429,6 +430,11 @@ export class P12Signer implements Signer {
     }
 
     const signature = await cryptoEngine.sign(signAlgorithm, this.privateKey, new Uint8Array(data));
+
+    // WebCrypto ECDSA returns P1363 format (r || s), but CMS requires DER format
+    if (this.signatureAlgorithm === "ECDSA") {
+      return new Uint8Array(createCMSECDSASignature(signature));
+    }
 
     return new Uint8Array(signature);
   }
