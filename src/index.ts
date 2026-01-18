@@ -14,6 +14,8 @@ export {
   type CopyPagesOptions,
   type DocumentMetadata,
   type ExtractPagesOptions,
+  type FlattenAllOptions,
+  type FlattenAllResult,
   type LoadOptions,
   type MergeOptions,
   PDF,

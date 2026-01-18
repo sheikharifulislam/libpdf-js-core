@@ -5,8 +5,11 @@
  * Wraps the low-level parsing and writing infrastructure.
  */
 
+import { AnnotationFlattener } from "#src/annotations/flattener";
+import type { FlattenAnnotationsOptions } from "#src/annotations/types";
 import type { AddAttachmentOptions, AttachmentInfo } from "#src/attachments/types";
 import { hasChanges } from "#src/document/change-collector";
+import type { FlattenOptions } from "#src/document/forms/form-flattener";
 import { isLinearizationDict } from "#src/document/linearization";
 import { ObjectCopier } from "#src/document/object-copier";
 import { ObjectRegistry } from "#src/document/object-registry";
@@ -63,6 +66,28 @@ import { PDFSignature } from "./pdf-signature";
  */
 export interface LoadOptions extends ParseOptions {
   // Inherits credentials, lenient from ParseOptions
+}
+
+/**
+ * Options for flattening all interactive content.
+ */
+export interface FlattenAllOptions {
+  /** Options for form field flattening */
+  form?: FlattenOptions;
+  /** Options for annotation flattening */
+  annotations?: FlattenAnnotationsOptions;
+}
+
+/**
+ * Result of flattening all interactive content.
+ */
+export interface FlattenAllResult {
+  /** Number of layers (OCGs) flattened */
+  layers: number;
+  /** Number of form fields flattened */
+  formFields: number;
+  /** Number of annotations flattened */
+  annotations: number;
 }
 
 /**
@@ -2437,6 +2462,96 @@ export class PDF {
    */
   flattenLayers(): FlattenLayersResult {
     return LayerUtils.flattenLayers(this.ctx);
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Annotation Flattening
+  // ─────────────────────────────────────────────────────────────────────────────
+
+  /**
+   * Flatten all annotations in the document into static page content.
+   *
+   * Annotations are converted to static graphics drawn on each page's content.
+   * After flattening, annotations are removed from the document.
+   *
+   * Annotations without appearances that cannot be generated are removed.
+   * Widget annotations (form fields) and Link annotations are not affected.
+   *
+   * @param options - Flattening options
+   * @returns Total number of annotations flattened across all pages
+   *
+   * @example
+   * ```typescript
+   * // Flatten all annotations in the document
+   * const count = pdf.flattenAnnotations();
+   * console.log(`Flattened ${count} annotations`);
+   *
+   * // Flatten but keep link annotations interactive
+   * pdf.flattenAnnotations({ exclude: ["Link"] });
+   * ```
+   */
+  flattenAnnotations(options?: FlattenAnnotationsOptions): number {
+    const flattener = new AnnotationFlattener(this.ctx.registry);
+
+    let totalFlattened = 0;
+    const pageRefs = this.ctx.pages.getPages();
+
+    for (const pageRef of pageRefs) {
+      const pageDict = this.ctx.resolve(pageRef);
+
+      if (!(pageDict instanceof PdfDict)) {
+        continue;
+      }
+
+      totalFlattened += flattener.flattenPage(pageDict, options);
+    }
+
+    return totalFlattened;
+  }
+
+  /**
+   * Flatten all interactive content in the document.
+   *
+   * This is a convenience method that flattens:
+   * - Layers (OCGs) - prevents hidden content attacks
+   * - Form fields - converts to static text/graphics
+   * - Annotations - bakes appearances into page content
+   *
+   * Use this before signing to ensure all content is visible and static,
+   * preventing attacks where content could be hidden or changed after signing.
+   *
+   * @param options - Options for flattening
+   * @returns Statistics about what was flattened
+   *
+   * @example
+   * ```typescript
+   * // Security workflow before signing
+   * const result = pdf.flattenAll();
+   * console.log(`Flattened: ${result.layers} layers, ${result.formFields} fields, ${result.annotations} annotations`);
+   * await pdf.sign({ signer });
+   * ```
+   */
+  flattenAll(options?: FlattenAllOptions): FlattenAllResult {
+    // Flatten layers first (affects visibility of everything)
+    const layerResult = this.flattenLayers();
+
+    // Flatten form fields
+    const form = this.getForm();
+    let formFields = 0;
+
+    if (form) {
+      formFields = form.getFields().length;
+      form.flatten(options?.form);
+    }
+
+    // Flatten annotations last (may reference form widgets which are now gone)
+    const annotations = this.flattenAnnotations(options?.annotations);
+
+    return {
+      layers: layerResult.layerCount,
+      formFields,
+      annotations,
+    };
   }
 
   // ─────────────────────────────────────────────────────────────────────────────

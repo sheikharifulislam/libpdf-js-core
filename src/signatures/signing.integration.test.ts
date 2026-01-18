@@ -590,6 +590,23 @@ describe("signing integration", () => {
     });
   });
 
+  describe("scenarios", () => {
+    it("signs example-filled-in.pdf", async () => {
+      const pdfBytes = await loadFixture("scenarios", "example-filled-in.pdf");
+      const pdf = await PDF.load(pdfBytes);
+      const signer = await loadTestSigner();
+
+      // Flatten all interactive content to prevent hidden content attacks
+      pdf.flattenAll();
+
+      await pdf.reload(await pdf.save());
+
+      const { bytes } = await pdf.sign({ signer });
+
+      await saveTestOutput("signatures/scenarios/example-filled-in.pdf", bytes);
+    });
+  });
+
   describe("error handling", () => {
     it("throws on invalid P12 password", async () => {
       const p12Bytes = await loadFixture("certificates", "test-signer-aes256.p12");

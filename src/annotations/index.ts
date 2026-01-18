@@ -7,6 +7,8 @@
 
 // Base classes
 export { PDFAnnotation, parseColorArray, rectToArray } from "./base";
+// Flattening
+export { AnnotationFlattener } from "./flattener";
 // Annotation types
 export { type CaretSymbol, PDFCaretAnnotation } from "./caret";
 // Factory

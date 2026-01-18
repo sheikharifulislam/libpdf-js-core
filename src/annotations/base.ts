@@ -300,6 +300,7 @@ export class PDFAnnotation {
    */
   setBorderStyle(style: BorderStyle): void {
     const bs = new PdfDict();
+
     bs.set("W", PdfNumber.of(style.width ?? 1));
     bs.set("S", PdfName.of(BORDER_STYLE_REVERSE_MAP[style.style ?? "solid"]));
 
@@ -319,13 +320,17 @@ export class PDFAnnotation {
    * Check if the annotation has a normal appearance stream.
    */
   hasNormalAppearance(): boolean {
-    const ap = this.dict.getDict("AP");
+    let ap = this.dict.get("AP");
 
-    if (!ap) {
-      return false;
+    if (ap instanceof PdfRef) {
+      ap = this.registry.resolve(ap) ?? undefined;
     }
 
-    return ap.has("N");
+    if (ap instanceof PdfDict) {
+      return ap.has("N");
+    }
+
+    return false;
   }
 
   /**
@@ -374,9 +379,13 @@ export class PDFAnnotation {
    * Get an appearance stream by type.
    */
   private getAppearance(type: "N" | "R" | "D"): PdfStream | null {
-    const ap = this.dict.getDict("AP");
+    let ap = this.dict.get("AP");
 
-    if (!ap) {
+    if (ap instanceof PdfRef) {
+      ap = this.registry.resolve(ap) ?? undefined;
+    }
+
+    if (!(ap instanceof PdfDict)) {
       return null;
     }
 
@@ -404,17 +413,23 @@ export class PDFAnnotation {
    * Set an appearance stream by type.
    */
   private setAppearance(type: "N" | "R" | "D", stream: PdfStream): void {
-    let ap = this.dict.getDict("AP");
+    let ap = this.dict.get("AP");
 
-    if (!ap) {
-      ap = new PdfDict();
-      this.dict.set("AP", ap);
+    if (ap instanceof PdfRef) {
+      ap = this.registry.resolve(ap) ?? undefined;
     }
 
-    // Register the stream and store the reference
-    const streamRef = this.registry.register(stream);
-    ap.set(type, streamRef);
-    this.markModified();
+    if (ap instanceof PdfDict) {
+      // Register the stream and store the reference
+      const streamRef = this.registry.register(stream);
+      ap.set(type, streamRef);
+      this.markModified();
+
+      return;
+    }
+
+    ap = new PdfDict();
+    this.dict.set("AP", ap);
   }
 
   // ─────────────────────────────────────────────────────────────────────────────

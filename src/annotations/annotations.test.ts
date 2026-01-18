@@ -583,4 +583,258 @@ describe("PDFAnnotations", () => {
       expect(highlight.isHidden).toBe(false);
     });
   });
+
+  describe("flattenAnnotations()", () => {
+    it("flattens highlight annotation on page", async () => {
+      const pdf = PDF.create();
+      const page = pdf.addPage();
+
+      page.addHighlightAnnotation({
+        rect: { x: 100, y: 700, width: 200, height: 14 },
+        color: rgb(1, 1, 0),
+      });
+
+      expect(page.getAnnotations()).toHaveLength(1);
+
+      const count = page.flattenAnnotations();
+
+      expect(count).toBe(1);
+      expect(page.getAnnotations()).toHaveLength(0);
+    });
+
+    it("flattens multiple annotations on page", async () => {
+      const pdf = PDF.create();
+      const page = pdf.addPage();
+
+      page.addHighlightAnnotation({
+        rect: { x: 100, y: 700, width: 200, height: 14 },
+        color: rgb(1, 1, 0),
+      });
+
+      page.addUnderlineAnnotation({
+        rect: { x: 100, y: 680, width: 200, height: 14 },
+        color: rgb(0, 0, 1),
+      });
+
+      page.addStrikeOutAnnotation({
+        rect: { x: 100, y: 660, width: 200, height: 14 },
+        color: rgb(1, 0, 0),
+      });
+
+      expect(page.getAnnotations()).toHaveLength(3);
+
+      const count = page.flattenAnnotations();
+
+      expect(count).toBe(3);
+      expect(page.getAnnotations()).toHaveLength(0);
+    });
+
+    it("preserves link annotations during flatten", async () => {
+      const pdf = PDF.create();
+      const page = pdf.addPage();
+
+      page.addHighlightAnnotation({
+        rect: { x: 100, y: 700, width: 200, height: 14 },
+        color: rgb(1, 1, 0),
+      });
+
+      page.addLinkAnnotation({
+        rect: { x: 100, y: 600, width: 200, height: 20 },
+        uri: "https://example.com",
+      });
+
+      expect(page.getAnnotations()).toHaveLength(2);
+
+      const count = page.flattenAnnotations();
+
+      // Link is non-flattenable, so only highlight is flattened
+      expect(count).toBe(1);
+
+      const remaining = page.getAnnotations();
+      expect(remaining).toHaveLength(1);
+      expect(remaining[0].type).toBe("Link");
+    });
+
+    it("excludes specified annotation types from flattening", async () => {
+      const pdf = PDF.create();
+      const page = pdf.addPage();
+
+      page.addHighlightAnnotation({
+        rect: { x: 100, y: 700, width: 200, height: 14 },
+        color: rgb(1, 1, 0),
+      });
+
+      page.addUnderlineAnnotation({
+        rect: { x: 100, y: 680, width: 200, height: 14 },
+        color: rgb(0, 0, 1),
+      });
+
+      expect(page.getAnnotations()).toHaveLength(2);
+
+      const count = page.flattenAnnotations({ exclude: ["Underline"] });
+
+      expect(count).toBe(1);
+
+      const remaining = page.getAnnotations();
+      expect(remaining).toHaveLength(1);
+      expect(remaining[0].type).toBe("Underline");
+    });
+
+    it("adds content to page after flattening", async () => {
+      const pdf = PDF.create();
+      const page = pdf.addPage();
+
+      // Check page has no content initially
+      const contentsBefore = page.dict.get("Contents");
+      expect(contentsBefore).toBeUndefined();
+
+      page.addHighlightAnnotation({
+        rect: { x: 100, y: 700, width: 200, height: 14 },
+        color: rgb(1, 1, 0),
+      });
+
+      page.flattenAnnotations();
+
+      // After flattening, page should have content
+      const contentsAfter = page.dict.get("Contents");
+      expect(contentsAfter).toBeTruthy();
+    });
+
+    it("adds XObject resources to page after flattening", async () => {
+      const pdf = PDF.create();
+      const page = pdf.addPage();
+
+      page.addHighlightAnnotation({
+        rect: { x: 100, y: 700, width: 200, height: 14 },
+        color: rgb(1, 1, 0),
+      });
+
+      page.flattenAnnotations();
+
+      // After flattening, page should have XObject resources
+      const resources = page.dict.getDict("Resources");
+      expect(resources).toBeTruthy();
+
+      const xObjects = resources?.getDict("XObject");
+      expect(xObjects).toBeTruthy();
+    });
+
+    it("persists flattening through save/load", async () => {
+      const pdf = PDF.create();
+      const page = pdf.addPage();
+
+      page.addHighlightAnnotation({
+        rect: { x: 100, y: 700, width: 200, height: 14 },
+        color: rgb(1, 1, 0),
+      });
+
+      page.flattenAnnotations();
+
+      // Save and reload
+      const bytes = await pdf.save();
+      const reloaded = await PDF.load(bytes);
+      const reloadedPage = reloaded.getPage(0);
+
+      expect(reloadedPage).toBeTruthy();
+
+      // Annotations should remain empty
+      expect(reloadedPage!.getAnnotations()).toHaveLength(0);
+
+      // Page should have content (the flattened annotations)
+      const contents = reloadedPage!.dict.get("Contents");
+      expect(contents).toBeTruthy();
+    });
+
+    it("returns 0 for page with no annotations", async () => {
+      const pdf = PDF.create();
+      const page = pdf.addPage();
+
+      const count = page.flattenAnnotations();
+
+      expect(count).toBe(0);
+    });
+
+    it("removes hidden annotations without flattening them", async () => {
+      const pdf = PDF.create();
+      const page = pdf.addPage();
+
+      const highlight = page.addHighlightAnnotation({
+        rect: { x: 100, y: 700, width: 200, height: 14 },
+        color: rgb(1, 1, 0),
+      });
+
+      // Hide the annotation
+      highlight.setHidden(true);
+
+      expect(page.getAnnotations()).toHaveLength(1);
+
+      // Flatten should remove the hidden annotation but not count it as flattened
+      const count = page.flattenAnnotations();
+
+      // Hidden annotations are removed but not drawn, so count is 0
+      expect(count).toBe(0);
+      expect(page.getAnnotations()).toHaveLength(0);
+    });
+  });
+
+  describe("pdf.flattenAnnotations()", () => {
+    it("flattens annotations across all pages", async () => {
+      const pdf = PDF.create();
+
+      const page1 = pdf.addPage();
+      page1.addHighlightAnnotation({
+        rect: { x: 100, y: 700, width: 200, height: 14 },
+        color: rgb(1, 1, 0),
+      });
+
+      const page2 = pdf.addPage();
+      page2.addUnderlineAnnotation({
+        rect: { x: 100, y: 700, width: 200, height: 14 },
+        color: rgb(0, 0, 1),
+      });
+      page2.addStrikeOutAnnotation({
+        rect: { x: 100, y: 680, width: 200, height: 14 },
+        color: rgb(1, 0, 0),
+      });
+
+      // Total 3 annotations across 2 pages
+      expect(page1.getAnnotations()).toHaveLength(1);
+      expect(page2.getAnnotations()).toHaveLength(2);
+
+      const count = pdf.flattenAnnotations();
+
+      expect(count).toBe(3);
+
+      // Check all pages have no annotations
+      const reloadedPage1 = pdf.getPage(0);
+      const reloadedPage2 = pdf.getPage(1);
+
+      expect(reloadedPage1!.getAnnotations()).toHaveLength(0);
+      expect(reloadedPage2!.getAnnotations()).toHaveLength(0);
+    });
+
+    it("excludes specified types across all pages", async () => {
+      const pdf = PDF.create();
+
+      const page1 = pdf.addPage();
+      page1.addHighlightAnnotation({
+        rect: { x: 100, y: 700, width: 200, height: 14 },
+        color: rgb(1, 1, 0),
+      });
+
+      const page2 = pdf.addPage();
+      page2.addHighlightAnnotation({
+        rect: { x: 100, y: 700, width: 200, height: 14 },
+        color: rgb(1, 1, 0),
+      });
+
+      const count = pdf.flattenAnnotations({ exclude: ["Highlight"] });
+
+      expect(count).toBe(0);
+
+      // Highlights should still exist
+      expect(pdf.getPage(0)!.getAnnotations()).toHaveLength(1);
+      expect(pdf.getPage(1)!.getAnnotations()).toHaveLength(1);
+    });
+  });
 });

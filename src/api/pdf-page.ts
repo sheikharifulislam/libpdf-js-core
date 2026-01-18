@@ -24,6 +24,7 @@ import type { PDFAnnotation } from "#src/annotations/base";
 import type { PDFCaretAnnotation } from "#src/annotations/caret";
 import { createAnnotation, isPopupAnnotation, isWidgetAnnotation } from "#src/annotations/factory";
 import type { PDFFileAttachmentAnnotation } from "#src/annotations/file-attachment";
+import { AnnotationFlattener } from "#src/annotations/flattener";
 import type { PDFFreeTextAnnotation } from "#src/annotations/free-text";
 import { PDFInkAnnotation } from "#src/annotations/ink";
 import { PDFLineAnnotation } from "#src/annotations/line";
@@ -41,6 +42,7 @@ import {
 } from "#src/annotations/text-markup";
 import type {
   CircleAnnotationOptions,
+  FlattenAnnotationsOptions,
   InkAnnotationOptions,
   LineAnnotationOptions,
   LinkAnnotationOptions,
@@ -1875,6 +1877,41 @@ export class PDFPage {
     for (const annotation of toRemove) {
       this.removeAnnotation(annotation);
     }
+  }
+
+  /**
+   * Flatten all annotations on this page into static content.
+   *
+   * Annotations are converted to static graphics drawn on the page content.
+   * After flattening, annotations are removed from the page.
+   *
+   * Annotations without appearances that cannot be generated are removed.
+   * Widget annotations (form fields) and Link annotations are not affected.
+   *
+   * @param options - Flattening options
+   * @returns Number of annotations flattened
+   *
+   * @example
+   * ```typescript
+   * // Flatten all annotations on a page
+   * const count = page.flattenAnnotations();
+   *
+   * // Flatten but keep link annotations interactive
+   * page.flattenAnnotations({ exclude: ["Link"] });
+   * ```
+   */
+  flattenAnnotations(options?: FlattenAnnotationsOptions): number {
+    if (!this.ctx) {
+      return 0;
+    }
+
+    const flattener = new AnnotationFlattener(this.ctx.registry);
+    const count = flattener.flattenPage(this.dict, options);
+
+    // Invalidate annotation cache since annotations were removed
+    this.invalidateAnnotationCache();
+
+    return count;
   }
 
   /**
