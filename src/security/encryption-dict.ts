@@ -9,17 +9,16 @@
 
 import { PdfDict } from "../objects/pdf-dict";
 import { EncryptionDictError } from "./errors";
-import { type Permissions, parsePermissions } from "./permissions";
+import { parsePermissions, type Permissions } from "./permissions";
 import {
-  type AuthEvent,
-  AuthEventSchema,
   type CryptFilter,
-  CryptFilterMethodSchema,
   type EncryptionAlgorithm,
-  type Revision,
-  RevisionSchema,
-  type Version,
-  VersionSchema,
+  type EncryptionRevision,
+  type EncryptionVersion,
+  isAuthEvent,
+  isCryptFilterMethod,
+  isEncryptionRevision,
+  isEncryptionVersion,
 } from "./schemas";
 
 export { EncryptionDictError } from "./errors";
@@ -29,8 +28,8 @@ export type {
   CryptFilter,
   CryptFilterMethod,
   EncryptionAlgorithm,
-  Revision,
-  Version,
+  EncryptionRevision,
+  EncryptionVersion,
 } from "./schemas";
 
 /**
@@ -43,10 +42,10 @@ export interface EncryptionDict {
   filter: "Standard";
 
   /** Algorithm version: 1, 2, 3, 4, or 5 */
-  version: Version;
+  version: EncryptionVersion;
 
   /** Standard security handler revision: 2, 3, 4, 5, or 6 */
-  revision: Revision;
+  revision: EncryptionRevision;
 
   /** Key length in bits (40-256) */
   keyLengthBits: number;
@@ -98,35 +97,25 @@ export interface EncryptionDict {
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * Parse a crypt filter dictionary with Zod validation.
+ * Parse a crypt filter dictionary.
  */
 function parseCryptFilter(dict: PdfDict): CryptFilter {
-  const cfmRaw = dict.getName("CFM")?.value ?? "None";
-  const authEventRaw = dict.getName("AuthEvent")?.value;
+  const cfm = dict.getName("CFM")?.value ?? "None";
+  const authEvent = dict.getName("AuthEvent")?.value;
   const length = dict.getNumber("Length")?.value;
 
   // Validate CFM
-  const cfmResult = CryptFilterMethodSchema.safeParse(cfmRaw);
-
-  if (!cfmResult.success) {
-    throw new EncryptionDictError(`Invalid crypt filter method: ${cfmRaw}`);
+  if (!isCryptFilterMethod(cfm)) {
+    throw new EncryptionDictError(`Invalid crypt filter method: ${cfm}`);
   }
 
   // Validate AuthEvent if present
-  let authEvent: AuthEvent | undefined;
-
-  if (authEventRaw !== undefined) {
-    const authEventResult = AuthEventSchema.safeParse(authEventRaw);
-
-    if (!authEventResult.success) {
-      throw new EncryptionDictError(`Invalid auth event: ${authEventRaw}`);
-    }
-
-    authEvent = authEventResult.data;
+  if (authEvent !== undefined && !isAuthEvent(authEvent)) {
+    throw new EncryptionDictError(`Invalid auth event: ${authEvent}`);
   }
 
   return {
-    cfm: cfmResult.data,
+    cfm,
     authEvent,
     length,
   };
@@ -136,8 +125,8 @@ function parseCryptFilter(dict: PdfDict): CryptFilter {
  * Determine the encryption algorithm from version and revision.
  */
 function determineAlgorithm(
-  version: Version,
-  revision: Revision,
+  version: EncryptionVersion,
+  revision: EncryptionRevision,
   cryptFilters?: Map<string, CryptFilter>,
   streamFilter?: string,
 ): EncryptionAlgorithm {
@@ -176,39 +165,35 @@ function determineAlgorithm(
 /**
  * Parse and validate the encryption version.
  */
-function parseVersion(dict: PdfDict): Version {
-  const versionRaw = dict.getNumber("V")?.value;
+function parseVersion(dict: PdfDict): EncryptionVersion {
+  const version = dict.getNumber("V")?.value;
 
-  if (versionRaw === undefined) {
+  if (version === undefined) {
     throw new EncryptionDictError("Missing /V (version) in encryption dictionary");
   }
 
-  const result = VersionSchema.safeParse(versionRaw);
-
-  if (!result.success) {
-    throw new EncryptionDictError(`Unsupported encryption version: ${versionRaw}`);
+  if (!isEncryptionVersion(version)) {
+    throw new EncryptionDictError(`Unsupported encryption version: ${version}`);
   }
 
-  return result.data;
+  return version;
 }
 
 /**
  * Parse and validate the encryption revision.
  */
-function parseRevision(dict: PdfDict): Revision {
-  const revisionRaw = dict.getNumber("R")?.value;
+function parseRevision(dict: PdfDict): EncryptionRevision {
+  const revision = dict.getNumber("R")?.value;
 
-  if (revisionRaw === undefined) {
+  if (revision === undefined) {
     throw new EncryptionDictError("Missing /R (revision) in encryption dictionary");
   }
 
-  const result = RevisionSchema.safeParse(revisionRaw);
-
-  if (!result.success) {
-    throw new EncryptionDictError(`Unsupported encryption revision: ${revisionRaw}`);
+  if (!isEncryptionRevision(revision)) {
+    throw new EncryptionDictError(`Unsupported encryption revision: ${revision}`);
   }
 
-  return result.data;
+  return revision;
 }
 
 /**
@@ -393,7 +378,7 @@ export function parseEncryptionDict(dict: PdfDict): EncryptionDict {
 /**
  * Validate that V and R values are compatible.
  */
-function validateVersionRevision(version: Version, revision: Revision): void {
+function validateVersionRevision(version: EncryptionVersion, revision: EncryptionRevision): void {
   // Valid combinations per PDF spec:
   // V=1 → R=2
   // V=2 → R=3

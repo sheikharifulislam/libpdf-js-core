@@ -15,8 +15,8 @@ import { type DecryptionCredential, isPasswordCredential } from "./credentials";
 import {
   type EncryptionDict,
   getKeyLengthBytes,
-  type Revision,
-  type Version,
+  type EncryptionRevision,
+  type EncryptionVersion,
 } from "./encryption-dict";
 import { UnsupportedEncryptionError } from "./errors";
 import type { AbstractSecurityHandler } from "./handlers/abstract";
@@ -72,14 +72,14 @@ export class StandardSecurityHandler {
   /**
    * Get the encryption version.
    */
-  get version(): Version {
+  get version(): EncryptionVersion {
     return this.encryptDict.version;
   }
 
   /**
    * Get the encryption revision.
    */
-  get revision(): Revision {
+  get revision(): EncryptionRevision {
     return this.encryptDict.revision;
   }
 
