@@ -69,7 +69,7 @@ import type { WidgetAnnotation } from "#src/document/forms/widget-annotation";
 import { EmbeddedFont } from "#src/fonts/embedded-font";
 import { parseFont } from "#src/fonts/font-factory";
 import type { PdfFont } from "#src/fonts/pdf-font";
-import { isStandard14Font } from "#src/fonts/standard-14";
+import { getStandard14BasicMetrics, isStandard14Font } from "#src/fonts/standard-14";
 import { parseToUnicode } from "#src/fonts/to-unicode";
 // Annotation utilities - imported here to avoid dynamic require issues
 import { black } from "#src/helpers/colors";
@@ -115,6 +115,7 @@ import type {
   DrawTextOptions,
   FontInput,
 } from "./drawing/types";
+import { resolveRotationOrigin } from "./drawing/types";
 import type { PDFContext } from "./pdf-context";
 import type { PDFEmbeddedPage } from "./pdf-embedded-page";
 
@@ -792,9 +793,10 @@ export class PDFPage {
     let rotate: { angle: number; originX: number; originY: number } | undefined;
 
     if (options.rotate) {
-      const originX = options.rotate.origin?.x ?? options.x + options.width / 2;
-      const originY = options.rotate.origin?.y ?? options.y + options.height / 2;
-      rotate = { angle: options.rotate.angle, originX, originY };
+      const bounds = { x: options.x, y: options.y, width: options.width, height: options.height };
+      const defaultOrigin = { x: options.x + options.width / 2, y: options.y + options.height / 2 };
+      const origin = resolveRotationOrigin(options.rotate.origin, bounds, defaultOrigin);
+      rotate = { angle: options.rotate.angle, originX: origin.x, originY: origin.y };
     }
 
     const ops = drawRectangleOps({
@@ -920,9 +922,16 @@ export class PDFPage {
     let rotate: { angle: number; originX: number; originY: number } | undefined;
 
     if (options.rotate) {
-      const originX = options.rotate.origin?.x ?? options.x;
-      const originY = options.rotate.origin?.y ?? options.y;
-      rotate = { angle: options.rotate.angle, originX, originY };
+      // Ellipse bounds: x,y is center, so bounds start at x - xRadius, y - yRadius
+      const bounds = {
+        x: options.x - options.xRadius,
+        y: options.y - options.yRadius,
+        width: options.xRadius * 2,
+        height: options.yRadius * 2,
+      };
+      const defaultOrigin = { x: options.x, y: options.y }; // center
+      const origin = resolveRotationOrigin(options.rotate.origin, bounds, defaultOrigin);
+      rotate = { angle: options.rotate.angle, originX: origin.x, originY: origin.y };
     }
 
     const ops = drawEllipseOps({
@@ -1020,14 +1029,41 @@ export class PDFPage {
 
     // Apply rotation if specified
     if (options.rotate) {
-      const originX = options.rotate.origin?.x ?? x;
-      const originY = options.rotate.origin?.y ?? y;
+      // Calculate text bounds for named origins using font metrics
+      const textWidth = options.maxWidth ?? Math.max(...lines.map(l => l.width));
+
+      // Get font metrics for accurate bounds
+      let ascent: number;
+      let descent: number;
+
+      if (typeof font === "string") {
+        // Standard 14 font - use built-in metrics
+        const metrics = getStandard14BasicMetrics(font);
+        ascent = metrics ? (metrics.ascent * fontSize) / 1000 : fontSize * 0.8;
+        descent = metrics ? (Math.abs(metrics.descent) * fontSize) / 1000 : fontSize * 0.2;
+      } else {
+        // Embedded font - use font descriptor
+        const desc = font.descriptor;
+        ascent = desc ? (desc.ascent * fontSize) / 1000 : fontSize * 0.8;
+        descent = desc ? (Math.abs(desc.descent) * fontSize) / 1000 : fontSize * 0.2;
+      }
+
+      // For multiline text, height is from top of first line to bottom of last line
+      const firstLineTop = y + ascent;
+      const lastLineBottom = y - (lines.length - 1) * lineHeight - descent;
+      const textHeight = firstLineTop - lastLineBottom;
+
+      // Bounds: x is left edge, y is bottom of text block
+      const bounds = { x, y: lastLineBottom, width: textWidth, height: textHeight };
+      const defaultOrigin = { x, y }; // baseline of first line
+      const origin = resolveRotationOrigin(options.rotate.origin, bounds, defaultOrigin);
+
       const rad = (options.rotate.angle * Math.PI) / 180;
       const cos = Math.cos(rad);
       const sin = Math.sin(rad);
-      ops.push(concatMatrix(1, 0, 0, 1, originX, originY));
+      ops.push(concatMatrix(1, 0, 0, 1, origin.x, origin.y));
       ops.push(concatMatrix(cos, sin, -sin, cos, 0, 0));
-      ops.push(concatMatrix(1, 0, 0, 1, -originX, -originY));
+      ops.push(concatMatrix(1, 0, 0, 1, -origin.x, -origin.y));
     }
 
     // Set fill color for text
@@ -1150,18 +1186,20 @@ export class PDFPage {
 
     // Apply rotation if specified
     if (options.rotate) {
-      const originX = options.rotate.origin?.x ?? x + width / 2;
-      const originY = options.rotate.origin?.y ?? y + height / 2;
+      const bounds = { x, y, width, height };
+      const defaultOrigin = { x: x + width / 2, y: y + height / 2 }; // center
+      const origin = resolveRotationOrigin(options.rotate.origin, bounds, defaultOrigin);
+
       const rad = (options.rotate.angle * Math.PI) / 180;
       const cos = Math.cos(rad);
       const sin = Math.sin(rad);
 
       // Translate to origin, rotate, translate back
-      ops.push(`1 0 0 1 ${this.formatNumber(originX)} ${this.formatNumber(originY)} cm`);
+      ops.push(`1 0 0 1 ${this.formatNumber(origin.x)} ${this.formatNumber(origin.y)} cm`);
       ops.push(
         `${this.formatNumber(cos)} ${this.formatNumber(sin)} ${this.formatNumber(-sin)} ${this.formatNumber(cos)} 0 0 cm`,
       );
-      ops.push(`1 0 0 1 ${this.formatNumber(-originX)} ${this.formatNumber(-originY)} cm`);
+      ops.push(`1 0 0 1 ${this.formatNumber(-origin.x)} ${this.formatNumber(-origin.y)} cm`);
     }
 
     // Apply transformation matrix to scale and position

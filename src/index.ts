@@ -152,6 +152,7 @@ export { PdfString } from "./objects/pdf-string";
 
 export type { EmbeddedFont, EmbedFontOptions } from "./fonts/embedded-font";
 export { type Standard14FontName, StandardFonts } from "./fonts/standard-14";
+export { Standard14Font } from "./fonts/standard-14-font";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Images
@@ -187,6 +188,8 @@ export {
   type PathOptions,
   type PositionedWord,
   type Rotation,
+  type RotationOrigin,
+  type RotationOriginName,
   type TextLine,
 } from "./api/drawing";
 

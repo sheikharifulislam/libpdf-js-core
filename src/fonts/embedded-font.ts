@@ -361,6 +361,90 @@ export class EmbeddedFont extends PdfFont {
     return !this._usedInForm;
   }
 
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Font Metrics (convenience methods for users)
+  // ─────────────────────────────────────────────────────────────────────────────
+
+  /**
+   * Get width of text in points at a given font size.
+   *
+   * Alias for getTextWidth() to match Standard14Font API.
+   *
+   * @param text - The text to measure
+   * @param size - Font size in points
+   * @returns Width in points
+   */
+  widthOfTextAtSize(text: string, size: number): number {
+    return this.getTextWidth(text, size);
+  }
+
+  /**
+   * Get the height of the font at a given size.
+   *
+   * This returns the full height from descender to ascender.
+   *
+   * @param size - Font size in points
+   * @returns Height in points
+   */
+  heightAtSize(size: number): number {
+    const desc = this.descriptor;
+    if (!desc) {
+      return size; // Fallback
+    }
+
+    return ((desc.ascent - desc.descent) * size) / 1000;
+  }
+
+  /**
+   * Calculate font size needed to achieve a specific text height.
+   *
+   * @param height - Desired height in points
+   * @returns Font size in points
+   */
+  sizeAtHeight(height: number): number {
+    const desc = this.descriptor;
+    if (!desc) {
+      return height; // Fallback
+    }
+
+    const unitsHeight = desc.ascent - desc.descent;
+
+    return (height * 1000) / unitsHeight;
+  }
+
+  /**
+   * Calculate font size needed for text to fit a specific width.
+   *
+   * @param text - The text to measure
+   * @param width - Desired width in points
+   * @returns Font size in points
+   */
+  sizeAtWidth(text: string, width: number): number {
+    if (text.length === 0) {
+      return 0;
+    }
+
+    // Get width at size 1000 (in glyph units)
+    const codes = this.encodeText(text);
+    let totalWidth = 0;
+
+    for (const code of codes) {
+      totalWidth += this.getWidth(code);
+    }
+
+    if (totalWidth === 0) {
+      return 0;
+    }
+
+    // width = (totalWidth * size) / 1000
+    // size = (width * 1000) / totalWidth
+    return (width * 1000) / totalWidth;
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Private Methods
+  // ─────────────────────────────────────────────────────────────────────────────
+
   /**
    * Build a FontDescriptor from the font program.
    */

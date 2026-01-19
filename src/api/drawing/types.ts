@@ -32,16 +32,94 @@ export type LineCap = "butt" | "round" | "square";
 export type LineJoin = "miter" | "round" | "bevel";
 
 /**
+ * Named rotation origin positions.
+ * These are relative to the bounding box of the object being rotated.
+ */
+export type RotationOriginName =
+  | "top-left"
+  | "top-center"
+  | "top-right"
+  | "center-left"
+  | "center"
+  | "center-right"
+  | "bottom-left"
+  | "bottom-center"
+  | "bottom-right";
+
+/**
+ * Rotation origin - either explicit coordinates or a named position.
+ */
+export type RotationOrigin = { x: number; y: number } | RotationOriginName;
+
+/**
  * Rotation specification.
  */
 export interface Rotation {
   /** Rotation angle in degrees (counter-clockwise) */
   angle: number;
-  /** Rotation center point (default: object center) */
-  origin?: {
-    x: number;
-    y: number;
-  };
+  /**
+   * Rotation center point.
+   * Can be explicit coordinates `{ x, y }` or a named position like "center", "top-left", etc.
+   * Default varies by object type (usually center for shapes, bottom-left for text).
+   */
+  origin?: RotationOrigin;
+}
+
+/**
+ * Bounding box for calculating rotation origins.
+ */
+export interface BoundingBox {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+/**
+ * Resolve a rotation origin to explicit coordinates.
+ *
+ * @param origin - The origin specification (coordinates or named position)
+ * @param bounds - The bounding box of the object
+ * @param defaultOrigin - Default origin if none specified (as coordinates)
+ * @returns Explicit { x, y } coordinates
+ */
+export function resolveRotationOrigin(
+  origin: RotationOrigin | undefined,
+  bounds: BoundingBox,
+  defaultOrigin: { x: number; y: number },
+): { x: number; y: number } {
+  if (origin === undefined) {
+    return defaultOrigin;
+  }
+
+  // Explicit coordinates
+  if (typeof origin === "object") {
+    return origin;
+  }
+
+  // Named position - calculate from bounds
+  const { x, y, width, height } = bounds;
+
+  switch (origin) {
+    case "top-left":
+      return { x, y: y + height };
+    case "top-center":
+      return { x: x + width / 2, y: y + height };
+    case "top-right":
+      return { x: x + width, y: y + height };
+    case "center-left":
+      return { x, y: y + height / 2 };
+    case "center":
+      return { x: x + width / 2, y: y + height / 2 };
+    case "center-right":
+      return { x: x + width, y: y + height / 2 };
+    case "bottom-left":
+      return { x, y };
+    case "bottom-center":
+      return { x: x + width / 2, y };
+    case "bottom-right":
+      return { x: x + width, y };
+  }
 }
 
 /**

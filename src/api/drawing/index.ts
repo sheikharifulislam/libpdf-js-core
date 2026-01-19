@@ -15,6 +15,7 @@ export type { LayoutResult, PositionedWord, TextLine } from "./text-layout";
 export { layoutJustifiedLine, layoutText, measureText } from "./text-layout";
 // Types
 export type {
+  BoundingBox,
   DrawCircleOptions,
   DrawEllipseOptions,
   DrawImageOptions,
@@ -26,6 +27,8 @@ export type {
   LineJoin,
   PathOptions,
   Rotation,
+  RotationOrigin,
+  RotationOriginName,
   TextAlignment,
 } from "./types";
-export { lineCapToNumber, lineJoinToNumber } from "./types";
+export { lineCapToNumber, lineJoinToNumber, resolveRotationOrigin } from "./types";

@@ -5,6 +5,7 @@
  * in the test-output directory.
  */
 
+import { Standard14Font } from "#src/fonts/standard-14-font";
 import { black, blue, cmyk, grayscale, green, red, rgb, white } from "#src/helpers/colors";
 import { isPdfHeader, loadFixture, saveTestOutput } from "#src/test-utils";
 import { describe, expect, it } from "vitest";
@@ -1269,6 +1270,432 @@ describe("Drawing API Integration", () => {
       const bytes = await pdf.save();
       expect(isPdfHeader(bytes)).toBe(true);
       await saveTestOutput("drawing/complete-demo.pdf", bytes);
+    });
+  });
+
+  describe("rotation origins", () => {
+    // Helper to calculate origin point for visualization
+    function getOriginPoint(
+      x: number,
+      y: number,
+      width: number,
+      height: number,
+      origin:
+        | "top-left"
+        | "top-center"
+        | "top-right"
+        | "center-left"
+        | "center"
+        | "center-right"
+        | "bottom-left"
+        | "bottom-center"
+        | "bottom-right",
+    ): { x: number; y: number } {
+      switch (origin) {
+        case "top-left":
+          return { x, y: y + height };
+        case "top-center":
+          return { x: x + width / 2, y: y + height };
+        case "top-right":
+          return { x: x + width, y: y + height };
+        case "center-left":
+          return { x, y: y + height / 2 };
+        case "center":
+          return { x: x + width / 2, y: y + height / 2 };
+        case "center-right":
+          return { x: x + width, y: y + height / 2 };
+        case "bottom-left":
+          return { x, y };
+        case "bottom-center":
+          return { x: x + width / 2, y };
+        case "bottom-right":
+          return { x: x + width, y };
+        default:
+          return { x, y };
+      }
+    }
+
+    it("rotates rectangles around different named origins", async () => {
+      const pdf = PDF.create();
+      const page = pdf.addPage({ size: "letter" });
+      const gray = grayscale(0.8);
+
+      // Title
+      page.drawText("Rectangle Rotation Origins", {
+        x: 50,
+        y: 750,
+        size: 18,
+        font: "Helvetica-Bold",
+      });
+      page.drawText("Gray border = original position, colored = rotated 30 degrees", {
+        x: 50,
+        y: 730,
+        size: 10,
+        color: grayscale(0.4),
+      });
+
+      const origins = [
+        "top-left",
+        "top-center",
+        "top-right",
+        "center-left",
+        "center",
+        "center-right",
+        "bottom-left",
+        "bottom-center",
+        "bottom-right",
+      ] as const;
+
+      const colors = [
+        rgb(0.9, 0.3, 0.3), // red
+        rgb(0.3, 0.7, 0.3), // green
+        rgb(0.3, 0.3, 0.9), // blue
+        rgb(0.9, 0.6, 0.2), // orange
+        rgb(0.6, 0.3, 0.9), // purple
+        rgb(0.2, 0.7, 0.7), // teal
+        rgb(0.9, 0.5, 0.7), // pink
+        rgb(0.5, 0.5, 0.2), // olive
+        rgb(0.4, 0.6, 0.8), // steel blue
+      ];
+
+      // Draw a 3x3 grid of rotated rectangles
+      for (let row = 0; row < 3; row++) {
+        for (let col = 0; col < 3; col++) {
+          const i = row * 3 + col;
+          const x = 80 + col * 180;
+          const y = 550 - row * 200;
+          const width = 100;
+          const height = 60;
+          const origin = origins[i];
+
+          // Draw label
+          page.drawText(origin, {
+            x: x + width / 2 - 30,
+            y: y + height + 15,
+            size: 9,
+            font: "Helvetica",
+          });
+
+          // Draw original position as gray border
+          page.drawRectangle({
+            x,
+            y,
+            width,
+            height,
+            borderColor: gray,
+            borderWidth: 1,
+            borderDashArray: [3, 2],
+          });
+
+          // Draw rotated rectangle
+          page.drawRectangle({
+            x,
+            y,
+            width,
+            height,
+            color: colors[i],
+            opacity: 0.7,
+            rotate: { angle: 30, origin },
+          });
+
+          // Mark the rotation origin point with a small circle
+          const originPoint = getOriginPoint(x, y, width, height, origin);
+          page.drawCircle({
+            x: originPoint.x,
+            y: originPoint.y,
+            radius: 3,
+            color: black,
+          });
+        }
+      }
+
+      const bytes = await pdf.save();
+      expect(isPdfHeader(bytes)).toBe(true);
+      await saveTestOutput("drawing/rotation-origins-rectangles.pdf", bytes);
+    });
+
+    it("rotates text around different named origins", async () => {
+      const pdf = PDF.create();
+      const page = pdf.addPage({ size: "letter" });
+      const gray = grayscale(0.8);
+
+      // Get font metrics for accurate bounds
+      const font = Standard14Font.of("Helvetica-Bold");
+      const fontSize = 14;
+      const text = "Hello!";
+      const textWidth = font.widthOfTextAtSize(text, fontSize);
+      const textHeight = font.heightAtSize(fontSize);
+
+      // Title
+      page.drawText("Text Rotation Origins", {
+        x: 50,
+        y: 750,
+        size: 18,
+        font: "Helvetica-Bold",
+      });
+      page.drawText("Gray border = text bounds, rotated 30 degrees", {
+        x: 50,
+        y: 730,
+        size: 10,
+        color: grayscale(0.4),
+      });
+
+      const origins = [
+        "top-left",
+        "top-center",
+        "top-right",
+        "center-left",
+        "center",
+        "center-right",
+        "bottom-left",
+        "bottom-center",
+        "bottom-right",
+      ] as const;
+
+      const colors = [
+        rgb(0.9, 0.3, 0.3),
+        rgb(0.3, 0.7, 0.3),
+        rgb(0.3, 0.3, 0.9),
+        rgb(0.9, 0.6, 0.2),
+        rgb(0.6, 0.3, 0.9),
+        rgb(0.2, 0.7, 0.7),
+        rgb(0.9, 0.5, 0.7),
+        rgb(0.5, 0.5, 0.2),
+        rgb(0.4, 0.6, 0.8),
+      ];
+
+      // Draw a 3x3 grid of rotated text
+      for (let row = 0; row < 3; row++) {
+        for (let col = 0; col < 3; col++) {
+          const i = row * 3 + col;
+          const x = 80 + col * 180;
+          const y = 550 - row * 200;
+          const origin = origins[i];
+
+          // Draw label
+          page.drawText(origin, {
+            x: x + 10,
+            y: y + 35,
+            size: 9,
+            font: "Helvetica",
+          });
+
+          // Draw text bounds as gray border
+          page.drawRectangle({
+            x,
+            y,
+            width: textWidth,
+            height: textHeight,
+            borderColor: gray,
+            borderWidth: 1,
+            borderDashArray: [3, 2],
+          });
+
+          // Draw rotated text
+          page.drawText(text, {
+            x,
+            y,
+            size: fontSize,
+            font: "Helvetica-Bold",
+            color: colors[i],
+            rotate: { angle: 30, origin },
+          });
+
+          // Mark the rotation origin point
+          const bounds = { x, y, width: textWidth, height: textHeight };
+          const originPoint = getOriginPoint(
+            bounds.x,
+            bounds.y,
+            bounds.width,
+            bounds.height,
+            origin,
+          );
+          page.drawCircle({
+            x: originPoint.x,
+            y: originPoint.y,
+            radius: 3,
+            color: black,
+          });
+        }
+      }
+
+      const bytes = await pdf.save();
+      expect(isPdfHeader(bytes)).toBe(true);
+      await saveTestOutput("drawing/rotation-origins-text.pdf", bytes);
+    });
+
+    it("rotates ellipses around different named origins", async () => {
+      const pdf = PDF.create();
+      const page = pdf.addPage({ size: "letter" });
+      const gray = grayscale(0.8);
+
+      // Title
+      page.drawText("Ellipse Rotation Origins", {
+        x: 50,
+        y: 750,
+        size: 18,
+        font: "Helvetica-Bold",
+      });
+      page.drawText("Gray border = bounding box, colored ellipse = rotated 45 degrees", {
+        x: 50,
+        y: 730,
+        size: 10,
+        color: grayscale(0.4),
+      });
+
+      const origins = [
+        "top-left",
+        "top-center",
+        "top-right",
+        "center-left",
+        "center",
+        "center-right",
+        "bottom-left",
+        "bottom-center",
+        "bottom-right",
+      ] as const;
+
+      const colors = [
+        rgb(0.9, 0.3, 0.3),
+        rgb(0.3, 0.7, 0.3),
+        rgb(0.3, 0.3, 0.9),
+        rgb(0.9, 0.6, 0.2),
+        rgb(0.6, 0.3, 0.9),
+        rgb(0.2, 0.7, 0.7),
+        rgb(0.9, 0.5, 0.7),
+        rgb(0.5, 0.5, 0.2),
+        rgb(0.4, 0.6, 0.8),
+      ];
+
+      // Draw a 3x3 grid of rotated ellipses
+      for (let row = 0; row < 3; row++) {
+        for (let col = 0; col < 3; col++) {
+          const i = row * 3 + col;
+          const cx = 130 + col * 180;
+          const cy = 580 - row * 200;
+          const xRadius = 60;
+          const yRadius = 30;
+          const origin = origins[i];
+
+          // Draw label
+          page.drawText(origin, {
+            x: cx - 30,
+            y: cy + yRadius + 20,
+            size: 9,
+            font: "Helvetica",
+          });
+
+          // Draw bounding box as gray border
+          page.drawRectangle({
+            x: cx - xRadius,
+            y: cy - yRadius,
+            width: xRadius * 2,
+            height: yRadius * 2,
+            borderColor: gray,
+            borderWidth: 1,
+            borderDashArray: [3, 2],
+          });
+
+          // Draw rotated ellipse
+          page.drawEllipse({
+            x: cx,
+            y: cy,
+            xRadius,
+            yRadius,
+            color: colors[i],
+            opacity: 0.7,
+            rotate: { angle: 45, origin },
+          });
+
+          // Mark the rotation origin point
+          const bounds = {
+            x: cx - xRadius,
+            y: cy - yRadius,
+            width: xRadius * 2,
+            height: yRadius * 2,
+          };
+          const originPoint = getOriginPoint(
+            bounds.x,
+            bounds.y,
+            bounds.width,
+            bounds.height,
+            origin,
+          );
+          page.drawCircle({
+            x: originPoint.x,
+            y: originPoint.y,
+            radius: 3,
+            color: black,
+          });
+        }
+      }
+
+      const bytes = await pdf.save();
+      expect(isPdfHeader(bytes)).toBe(true);
+      await saveTestOutput("drawing/rotation-origins-ellipses.pdf", bytes);
+    });
+
+    it("supports explicit {x, y} coordinates for rotation origin", async () => {
+      const pdf = PDF.create();
+      const page = pdf.addPage({ size: "letter" });
+      const gray = grayscale(0.8);
+
+      // Title
+      page.drawText("Custom {x, y} Rotation Origin", {
+        x: 50,
+        y: 750,
+        size: 18,
+        font: "Helvetica-Bold",
+      });
+      page.drawText("Rectangle rotated around a point outside its bounds", {
+        x: 50,
+        y: 730,
+        size: 10,
+        color: grayscale(0.4),
+      });
+
+      // Draw a rectangle rotating around an external point
+      const x = 200;
+      const y = 500;
+      const width = 80;
+      const height = 50;
+      const pivotX = 150;
+      const pivotY = 450;
+
+      // Draw the pivot point
+      page.drawCircle({
+        x: pivotX,
+        y: pivotY,
+        radius: 5,
+        color: red,
+      });
+      page.drawText("Pivot", {
+        x: pivotX - 15,
+        y: pivotY - 20,
+        size: 10,
+      });
+
+      // Draw original and multiple rotated versions
+      for (let angle = 0; angle <= 90; angle += 30) {
+        const opacity = angle === 0 ? 1 : 0.5;
+        const color = angle === 0 ? gray : rgb(0.3, 0.5, 0.9);
+
+        page.drawRectangle({
+          x,
+          y,
+          width,
+          height,
+          color,
+          opacity,
+          borderColor: black,
+          borderWidth: angle === 0 ? 1 : 0.5,
+          rotate: angle === 0 ? undefined : { angle, origin: { x: pivotX, y: pivotY } },
+        });
+      }
+
+      const bytes = await pdf.save();
+      expect(isPdfHeader(bytes)).toBe(true);
+      await saveTestOutput("drawing/rotation-origins-custom.pdf", bytes);
     });
   });
 
