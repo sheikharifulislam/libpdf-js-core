@@ -7,7 +7,7 @@
  */
 
 import { toArrayBuffer } from "#src/helpers/buffer.ts";
-import { derToPem, normalizePem } from "#src/helpers/pem.ts";
+import { derToPem, isPem, normalizePem, parsePem } from "#src/helpers/pem.ts";
 import { sha256, sha384, sha512 } from "@noble/hashes/sha2.js";
 import { fromBER } from "asn1js";
 import * as pkijs from "pkijs";
@@ -528,36 +528,51 @@ export class GoogleKmsSigner implements Signer {
   }
 
   /**
-   * Load a certificate from Google Secret Manager.
+   * Loads a signing certificate from Google Secret Manager for use with KMS-based signing.
    *
-   * The secret must contain a DER-encoded certificate. PEM format is NOT supported -
-   * convert to DER before storing in Secret Manager.
+   * This helper retrieves certificate material securely stored in Secret Manager, supporting
+   * both PEM and DER formats:
+   *   - If the secret contains PEM-encoded data, all certificates will be parsed.
+   *     The first is used as the signing cert (`cert`), and the remainder returned as
+   *     the optional `chain` (intermediates).
+   *   - If the secret contains raw DER data, it is returned as the signing cert (`cert`).
    *
-   * Supports cross-project access: the secret can be in a different GCP project
-   * than the KMS key.
+   * Supports cross-project use: the secret may be in a different GCP project than the KMS key.
    *
-   * @param secretVersionName - Full resource name, e.g.
-   *   "projects/my-project/secrets/my-cert/versions/latest"
-   * @param options - Optional client configuration
-   * @throws {KmsSignerError} if @google-cloud/secret-manager is not installed
+   * - The secret should contain the certificate in binary DER (recommended) or PEM format.
+   * - Private keys must never be stored in Secret Manager.
+   *
+   * @param secretVersionName Full resource name for the secret version,
+   *   e.g. "projects/my-project/secrets/my-cert/versions/latest"
+   * @param options Optional client configuration, including a SecretManagerServiceClient instance.
+   * @returns An object with `cert` (main certificate bytes) and optional `chain` (intermediates).
+   * @throws {KmsSignerError} if @google-cloud/secret-manager is not installed or retrieval fails.
    *
    * @example
-   * ```typescript
-   * // From same project
-   * const cert = await GoogleKmsSigner.getCertificateFromSecretManager(
+   * // Load a certificate from the same project
+   * const { cert } = await GoogleKmsSigner.getCertificateFromSecretManager(
    *   "projects/my-project/secrets/signing-cert/versions/latest"
    * );
    *
-   * // From different project (cross-project access)
-   * const cert = await GoogleKmsSigner.getCertificateFromSecretManager(
-   *   "projects/shared-certs-project/secrets/signing-cert/versions/1"
+   * // Load from a different project (cross-project access)
+   * const { cert, chain } = await GoogleKmsSigner.getCertificateFromSecretManager(
+   *   "projects/shared-certs-project/secrets/org-ca-cert/versions/1"
    * );
-   * ```
+   *
+   * // Use the result with KMS-based signing
+   * const signer = await GoogleKmsSigner.create({
+   *   keyVersionName: "...",
+   *   certificate: cert,
+   *   chain,
+   * });
    */
   static async getCertificateFromSecretManager(
     secretVersionName: string,
     options?: { client?: SecretManagerServiceClient },
-  ): Promise<Uint8Array> {
+  ): Promise<{
+    cert: Uint8Array;
+    chain?: Uint8Array[];
+  }> {
     // Dynamically import Secret Manager
     const secretManager = await importSecretManager();
 
@@ -573,12 +588,25 @@ export class GoogleKmsSigner implements Signer {
         throw new KmsSignerError(`Secret is empty: ${secretVersionName}`);
       }
 
-      // Handle both string and Uint8Array payloads
-      if (typeof version.payload.data === "string") {
-        return new TextEncoder().encode(version.payload.data);
+      let data =
+        typeof version.payload.data === "string"
+          ? version.payload.data
+          : new TextDecoder().decode(version.payload.data);
+
+      if (isPem(data)) {
+        const certs = parsePem(data).map(block => block.der);
+
+        const [first, ...rest] = certs;
+
+        return {
+          cert: first,
+          chain: rest,
+        };
       }
 
-      return new Uint8Array(version.payload.data);
+      return {
+        cert: new TextEncoder().encode(data),
+      };
     } catch (error) {
       if (error instanceof KmsSignerError) {
         throw error;

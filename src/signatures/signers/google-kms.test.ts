@@ -526,18 +526,18 @@ describe.skipIf(!canRunIntegrationTests)("GoogleKmsSigner integration", () => {
   describe.skipIf(!rsaCertSecret || !rsaKeyVersion)("Secret Manager integration", () => {
     it("loads certificate from Secret Manager and signs PDF", async () => {
       // Load certificate from Secret Manager
-      const certificate = await GoogleKmsSigner.getCertificateFromSecretManager(rsaCertSecret!);
+      const { cert } = await GoogleKmsSigner.getCertificateFromSecretManager(rsaCertSecret!);
 
-      expect(certificate).toBeInstanceOf(Uint8Array);
-      expect(certificate.length).toBeGreaterThan(0);
+      expect(cert).toBeInstanceOf(Uint8Array);
+      expect(cert.length).toBeGreaterThan(0);
 
       // Certificate should match the one we have locally
-      expect(certificate).toEqual(rsaCertificate);
+      expect(cert).toEqual(rsaCertificate);
 
       // Create signer using the certificate from Secret Manager
       const signer = await GoogleKmsSigner.create({
         keyVersionName: rsaKeyVersion!,
-        certificate,
+        certificate: cert,
       });
 
       expect(signer.keyType).toBe("RSA");
@@ -563,10 +563,10 @@ describe.skipIf(!canRunIntegrationTests)("GoogleKmsSigner integration", () => {
         return;
       }
 
-      const certificate = await GoogleKmsSigner.getCertificateFromSecretManager(ecCertSecret);
+      const { cert } = await GoogleKmsSigner.getCertificateFromSecretManager(ecCertSecret);
 
-      expect(certificate).toBeInstanceOf(Uint8Array);
-      expect(certificate).toEqual(ecCertificate);
+      expect(cert).toBeInstanceOf(Uint8Array);
+      expect(cert).toEqual(ecCertificate);
     });
   });
 });
