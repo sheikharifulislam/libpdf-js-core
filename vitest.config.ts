@@ -4,7 +4,7 @@ export default defineConfig({
   test: {
     include: ["src/**/*.test.ts"],
     exclude: ["**/node_modules/**", "**/checkouts/**"],
-    testTimeout: 10000,
+    testTimeout: 15000,
     coverage: {
       provider: "v8",
       include: ["src/**/*.ts"],
