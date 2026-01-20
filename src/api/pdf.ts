@@ -611,6 +611,46 @@ export class PDF {
     return this.ctx.info.version;
   }
 
+  /**
+   * Upgrade the PDF version.
+   *
+   * Sets the /Version entry in the catalog dictionary. This is the standard
+   * way to upgrade PDF version in incremental updates since the header
+   * cannot be modified.
+   *
+   * The version will only be upgraded if the new version is higher than
+   * the current version.
+   *
+   * @param version - Target version (e.g., "1.7", "2.0")
+   *
+   * @example
+   * ```typescript
+   * pdf.upgradeVersion("1.7");
+   * ```
+   */
+  upgradeVersion(version: string): void {
+    // Parse versions for comparison
+    const parseVersion = (v: string): number => {
+      const [major, minor] = v.split(".").map(Number);
+      return major * 10 + (minor || 0);
+    };
+
+    const currentVersion = parseVersion(this.ctx.info.version);
+    const targetVersion = parseVersion(version);
+
+    // Only upgrade, never downgrade
+    if (targetVersion <= currentVersion) {
+      return;
+    }
+
+    // Set the version in the catalog
+    const catalog = this.ctx.catalog.getDict();
+    catalog.set("Version", PdfName.of(version));
+
+    // Update internal version tracking
+    this.ctx.info.version = version;
+  }
+
   /** Whether the document is encrypted */
   get isEncrypted(): boolean {
     return this.ctx.info.isEncrypted;
