@@ -18,6 +18,7 @@
  */
 
 import { formatPdfDate, parsePdfDate } from "#src/helpers/format";
+import type { RefResolver } from "#src/helpers/types";
 import { PdfDict } from "#src/objects/pdf-dict";
 import { PdfName } from "#src/objects/pdf-name";
 import { PdfNumber } from "#src/objects/pdf-number";
@@ -27,11 +28,6 @@ import { PdfStream } from "#src/objects/pdf-stream";
 import { PdfString } from "#src/objects/pdf-string";
 
 import type { AddAttachmentOptions, AttachmentInfo } from "./types";
-
-/**
- * Function to resolve a reference to its object.
- */
-type Resolver = (ref: PdfRef) => PdfObject | null;
 
 /**
  * MIME type mappings for auto-detection.
@@ -137,7 +133,7 @@ function decodeFilename(str: PdfString): string {
  *
  * @returns The stream if found, null if external reference or missing
  */
-export function getEmbeddedFileStream(fileSpec: PdfDict, resolver: Resolver): PdfStream | null {
+export function getEmbeddedFileStream(fileSpec: PdfDict, resolver: RefResolver): PdfStream | null {
   // Get /EF (embedded file dictionary)
   const efEntry = fileSpec.get("EF");
   let ef: PdfDict | null = null;
@@ -183,7 +179,7 @@ export function getEmbeddedFileStream(fileSpec: PdfDict, resolver: Resolver): Pd
 export function parseFileSpec(
   fileSpec: PdfDict,
   name: string,
-  resolver: Resolver,
+  resolver: RefResolver,
 ): AttachmentInfo | null {
   // Get the embedded file stream
   const stream = getEmbeddedFileStream(fileSpec, resolver);

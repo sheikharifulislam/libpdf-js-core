@@ -1,3 +1,4 @@
+import type { RefResolver } from "#src/helpers/types";
 import { PdfArray } from "#src/objects/pdf-array";
 import { PdfDict } from "#src/objects/pdf-dict";
 import type { PdfObject } from "#src/objects/pdf-object";
@@ -5,12 +6,12 @@ import { PdfRef } from "#src/objects/pdf-ref";
 import { PdfString } from "#src/objects/pdf-string";
 import { describe, expect, it } from "vitest";
 
-import { buildNameTree, NameTree, type Resolver } from "./name-tree";
+import { buildNameTree, NameTree } from "./name-tree";
 
 /**
  * Create a simple resolver that looks up objects in a map.
  */
-function createResolver(objects: Map<string, PdfObject>): Resolver {
+function createResolver(objects: Map<string, PdfObject>): RefResolver {
   return (ref: PdfRef) => {
     const key = `${ref.objectNumber}:${ref.generation}`;
     return objects.get(key) ?? null;

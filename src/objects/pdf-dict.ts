@@ -1,3 +1,4 @@
+import type { RefResolver } from "#src/helpers/types";
 import type { ByteWriter } from "#src/io/byte-writer";
 
 import type { PdfArray } from "./pdf-array";
@@ -6,7 +7,7 @@ import { PdfName } from "./pdf-name";
 import type { PdfNumber } from "./pdf-number";
 import type { PdfObject } from "./pdf-object";
 import type { PdfPrimitive } from "./pdf-primitive";
-import type { PdfRef } from "./pdf-ref";
+import { PdfRef } from "./pdf-ref";
 import type { PdfString } from "./pdf-string";
 
 /**
@@ -54,10 +55,16 @@ export class PdfDict implements PdfPrimitive {
   /**
    * Get value for key. Key can be string or PdfName.
    */
-  get(key: PdfName | string): PdfObject | undefined {
+  get(key: PdfName | string, resolver?: RefResolver): PdfObject | undefined {
     const name = typeof key === "string" ? PdfName.of(key) : key;
 
-    return this.entries.get(name);
+    const value = this.entries.get(name);
+
+    if (resolver && value?.type === "ref") {
+      return resolver(value) ?? undefined;
+    }
+
+    return value;
   }
 
   /**
@@ -108,43 +115,52 @@ export class PdfDict implements PdfPrimitive {
   }
 
   /**
-   * Typed getters
+   * Typed getters.
+   *
+   * All typed getters accept an optional resolver function. When provided,
+   * if the value is a PdfRef, it will be automatically dereferenced.
+   * This prevents the common bug of forgetting to handle indirect references.
    */
 
-  getName(key: string): PdfName | undefined {
-    const value = this.get(key);
+  getName(key: string, resolver?: RefResolver): PdfName | undefined {
+    const value = this.get(key, resolver);
 
     return value?.type === "name" ? value : undefined;
   }
 
-  getNumber(key: string): PdfNumber | undefined {
-    const value = this.get(key);
+  getNumber(key: string, resolver?: RefResolver): PdfNumber | undefined {
+    const value = this.get(key, resolver);
 
     return value?.type === "number" ? value : undefined;
   }
 
-  getString(key: string): PdfString | undefined {
-    const value = this.get(key);
+  getString(key: string, resolver?: RefResolver): PdfString | undefined {
+    const value = this.get(key, resolver);
+
     return value?.type === "string" ? value : undefined;
   }
 
-  getArray(key: string): PdfArray | undefined {
-    const value = this.get(key);
+  getArray(key: string, resolver?: RefResolver): PdfArray | undefined {
+    const value = this.get(key, resolver);
+
     return value?.type === "array" ? value : undefined;
   }
 
-  getDict(key: string): PdfDict | undefined {
-    const value = this.get(key);
+  getDict(key: string, resolver?: RefResolver): PdfDict | undefined {
+    const value = this.get(key, resolver);
+
     return value?.type === "dict" ? value : undefined;
   }
 
   getRef(key: string): PdfRef | undefined {
     const value = this.get(key);
+
     return value?.type === "ref" ? value : undefined;
   }
 
-  getBool(key: string): PdfBool | undefined {
-    const value = this.get(key);
+  getBool(key: string, resolver?: RefResolver): PdfBool | undefined {
+    const value = this.get(key, resolver);
+
     return value?.type === "bool" ? value : undefined;
   }
 

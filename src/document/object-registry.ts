@@ -5,19 +5,10 @@
  * tracks new objects, and assigns object numbers.
  */
 
+import type { RefResolver } from "#src/helpers/types";
 import type { PdfObject } from "#src/objects/pdf-object";
 import { PdfRef } from "#src/objects/pdf-ref";
 import type { XRefEntry } from "#src/parser/xref-parser";
-
-/**
- * Function to resolve objects not yet in the registry.
- * Called when resolve() encounters an unknown reference.
- *
- * This is synchronous because all PDF data is loaded into memory
- * at parse time. The resolver simply parses objects on demand from
- * the in-memory buffer.
- */
-export type ObjectResolver = (ref: PdfRef) => PdfObject | null;
 
 /**
  * Registry for managing PDF objects and their references.
@@ -44,7 +35,7 @@ export class ObjectRegistry {
   private _nextObjNum: number;
 
   /** Resolver for objects not in registry */
-  private resolver: ObjectResolver | null = null;
+  private resolver: RefResolver | null = null;
 
   /** Warnings collected during operations */
   readonly warnings: string[] = [];
@@ -68,7 +59,7 @@ export class ObjectRegistry {
   /**
    * Set the resolver for fetching objects not yet in the registry.
    */
-  setResolver(resolver: ObjectResolver): void {
+  setResolver(resolver: RefResolver): void {
     this.resolver = resolver;
   }
 

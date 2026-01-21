@@ -6,6 +6,7 @@
  */
 
 import type { PDFContext } from "#src/api/pdf-context";
+import type { RefResolver } from "#src/helpers/types";
 import { PdfArray } from "#src/objects/pdf-array";
 import { PdfDict } from "#src/objects/pdf-dict";
 import { PdfName } from "#src/objects/pdf-name";
@@ -41,7 +42,7 @@ function refKey(ref: PdfRef): string {
  */
 function parseDefaultConfig(
   dDict: PdfObject | null | undefined,
-  resolve: (ref: PdfRef) => PdfObject | null,
+  resolve: RefResolver,
 ): DefaultConfig {
   const result: DefaultConfig = {
     baseState: "ON",

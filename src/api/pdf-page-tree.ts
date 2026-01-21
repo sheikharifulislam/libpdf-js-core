@@ -1,3 +1,4 @@
+import type { RefResolver } from "#src/helpers/types";
 import { PdfArray } from "#src/objects/pdf-array";
 import { PdfDict } from "#src/objects/pdf-dict";
 import { PdfNumber } from "#src/objects/pdf-number";
@@ -47,7 +48,7 @@ export class PDFPageTree {
   /**
    * Load and build the page tree by walking from the root.
    */
-  static load(pagesRef: PdfRef, getObject: (ref: PdfRef) => PdfObject | null): PDFPageTree {
+  static load(pagesRef: PdfRef, getObject: RefResolver): PDFPageTree {
     const pages: PdfRef[] = [];
     const visited = new Set<string>();
     const loadedPages = new Map<string, PdfDict>();
