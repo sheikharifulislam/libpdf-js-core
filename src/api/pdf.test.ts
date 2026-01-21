@@ -338,8 +338,8 @@ describe("PDF", () => {
       const bytes = await loadFixture("basic", "rot0.pdf");
       const pdf = await PDF.load(bytes);
 
-      // Manually set recovered flag
-      (pdf as unknown as { recoveredViaBruteForce: boolean }).recoveredViaBruteForce = true;
+      // Manually set recovered flag (access private field)
+      Object.assign(pdf, { _recoveredViaBruteForce: true });
 
       // Should not throw, just add warning
       const saved = await pdf.save({ incremental: true });
@@ -1326,6 +1326,72 @@ describe("PDF", () => {
       const prevCount = (text.match(/\/Prev /g) || []).length;
 
       expect(prevCount).toBeGreaterThanOrEqual(1);
+    });
+  });
+
+  describe("reload", () => {
+    it("updates usesXRefStreams when reloading with xref stream format", async () => {
+      const bytes = await loadFixture("basic", "rot0.pdf");
+      const pdf = await PDF.load(bytes);
+
+      // Original document should use xref table (not stream)
+      expect(pdf.usesXRefStreams).toBe(false);
+
+      // Make a modification to ensure save actually writes new content
+      pdf.getCatalog()?.set("TestKey", PdfNumber.of(1));
+
+      // Save with xref stream
+      const savedWithStream = await pdf.save({ useXRefStream: true });
+
+      // Reload from the saved bytes
+      await pdf.reload(savedWithStream);
+
+      // After reload, should detect that we now use xref streams
+      expect(pdf.usesXRefStreams).toBe(true);
+    });
+
+    it("updates usesXRefStreams when reloading with xref table format", async () => {
+      // Create a PDF and save it with xref stream first
+      const pdf = PDF.create();
+      pdf.addPage({ size: "letter" });
+
+      const savedWithStream = await pdf.save({ useXRefStream: true });
+
+      // Load it fresh to have usesXRefStreams = true
+      const pdf2 = await PDF.load(savedWithStream);
+      expect(pdf2.usesXRefStreams).toBe(true);
+
+      // Make a modification to ensure save actually writes new content
+      pdf2.getCatalog()?.set("TestKey", PdfNumber.of(2));
+
+      // Now save with xref table
+      const savedWithTable = await pdf2.save({ useXRefStream: false });
+
+      // Reload from the table-format bytes
+      await pdf2.reload(savedWithTable);
+
+      // After reload, should detect that we now use xref table
+      expect(pdf2.usesXRefStreams).toBe(false);
+    });
+
+    it("preserves correct xref format on subsequent incremental saves", async () => {
+      const bytes = await loadFixture("basic", "rot0.pdf");
+      const pdf = await PDF.load(bytes);
+
+      // Make a modification and save with xref stream
+      pdf.getCatalog()?.set("InitialChange", PdfNumber.of(1));
+      const saved1 = await pdf.save({ useXRefStream: true });
+      await pdf.reload(saved1);
+
+      expect(pdf.usesXRefStreams).toBe(true);
+
+      // Modify and do an incremental save (should use xref stream since that's what we have now)
+      pdf.getCatalog()?.set("Test", PdfNumber.of(2));
+      const saved2 = await pdf.save({ incremental: true });
+
+      // Verify the incremental save also used xref stream
+      const text = new TextDecoder().decode(saved2);
+      expect(text).toContain("/Type /XRef");
     });
   });
 

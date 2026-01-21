@@ -384,17 +384,24 @@ export function writeComplete(registry: ObjectRegistry, options: WriteOptions): 
     });
   }
 
-  // Calculate size (max object number + 1)
-  const size = Math.max(0, ...entries.map(e => e.objectNumber)) + 1;
-
   // Write xref section
   if (options.useXRefStream) {
-    // XRef stream needs its own object number
     const xrefObjNum = registry.nextObjectNumber;
+
+    // Add entry for the xref stream itself
+    entries.push({
+      objectNumber: xrefObjNum,
+      generation: 0,
+      type: "inuse",
+      offset: xrefOffset,
+    });
+
+    // Size is max object number + 1
+    const size = Math.max(0, ...entries.map(e => e.objectNumber)) + 1;
 
     writeXRefStream(writer, {
       entries,
-      size: size + 1, // Include xref stream itself
+      size,
       xrefOffset,
       root: options.root,
       info: options.info,
@@ -403,6 +410,9 @@ export function writeComplete(registry: ObjectRegistry, options: WriteOptions): 
       streamObjectNumber: xrefObjNum,
     });
   } else {
+    // Size is max object number + 1
+    const size = Math.max(0, ...entries.map(e => e.objectNumber)) + 1;
+
     writeXRefTable(writer, {
       entries,
       size,
@@ -530,12 +540,20 @@ export function writeIncremental(
     });
   }
 
-  // Calculate size (all objects including unchanged)
-  const size = Math.max(changes.maxObjectNumber + 1, registry.nextObjectNumber);
-
   // Write xref section with /Prev pointer
   if (options.useXRefStream) {
     const xrefObjNum = registry.nextObjectNumber;
+
+    // Add entry for the xref stream itself
+    entries.push({
+      objectNumber: xrefObjNum,
+      generation: 0,
+      type: "inuse",
+      offset: xrefOffset,
+    });
+
+    // Size must cover all objects (original + new), including xref stream
+    const size = Math.max(changes.maxObjectNumber + 1, xrefObjNum + 1);
 
     writeXRefStream(writer, {
       entries,
@@ -549,6 +567,9 @@ export function writeIncremental(
       streamObjectNumber: xrefObjNum,
     });
   } else {
+    // Size must cover all objects (original + new)
+    const size = Math.max(changes.maxObjectNumber + 1, registry.nextObjectNumber);
+
     writeXRefTable(writer, {
       entries,
       size,

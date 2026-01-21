@@ -302,6 +302,10 @@ function buildIndexArray(subsections: { start: number; entries: XRefWriteEntry[]
 /**
  * Write an xref stream (PDF 1.5+) to the provided ByteWriter.
  *
+ * The caller is responsible for:
+ * - Including an entry for the xref stream object itself in `entries`
+ * - Computing the correct `/Size` value (max object number + 1, across all sections for incremental updates)
+ *
  * Returns the stream object for reference.
  */
 export function writeXRefStream(

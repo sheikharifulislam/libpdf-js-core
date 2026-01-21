@@ -246,13 +246,28 @@ export class PDF {
   private _form: PDFForm | null | undefined;
 
   /** Whether this document was recovered via brute-force parsing */
-  readonly recoveredViaBruteForce: boolean;
+  private _recoveredViaBruteForce: boolean;
+
+  /** Whether this document was recovered via brute-force parsing */
+  get recoveredViaBruteForce(): boolean {
+    return this._recoveredViaBruteForce;
+  }
 
   /** Whether this document is linearized */
-  readonly isLinearized: boolean;
+  private _isLinearized: boolean;
+
+  /** Whether this document is linearized */
+  get isLinearized(): boolean {
+    return this._isLinearized;
+  }
 
   /** Whether the original document uses XRef streams (PDF 1.5+) */
-  readonly usesXRefStreams: boolean;
+  private _usesXRefStreams: boolean;
+
+  /** Whether the document uses XRef streams (PDF 1.5+) */
+  get usesXRefStreams(): boolean {
+    return this._usesXRefStreams;
+  }
 
   /**
    * Whether this document was newly created (not loaded from bytes).
@@ -295,9 +310,9 @@ export class PDF {
     this.originalBytes = originalBytes;
     this.originalXRefOffset = originalXRefOffset;
     this._isNewlyCreated = options.isNewlyCreated;
-    this.recoveredViaBruteForce = options.recoveredViaBruteForce;
-    this.isLinearized = options.isLinearized;
-    this.usesXRefStreams = options.usesXRefStreams;
+    this._recoveredViaBruteForce = options.recoveredViaBruteForce;
+    this._isLinearized = options.isLinearized;
+    this._usesXRefStreams = options.usesXRefStreams;
 
     // Set up font resolver for the context
     // Refs are pre-allocated, so this is synchronous
@@ -428,12 +443,33 @@ export class PDF {
     const registry = new ObjectRegistry(parsed.xref);
     registry.setResolver(ref => parsed.getObject(ref));
 
-    // Find xref offset
+    // Detect linearization by checking first object
+    let isLinearized = false;
+
+    try {
+      const firstObjNum = Math.min(...parsed.xref.keys());
+
+      if (firstObjNum > 0) {
+        const firstObj = parsed.getObject(PdfRef.of(firstObjNum, 0));
+
+        if (firstObj instanceof PdfDict && isLinearizationDict(firstObj)) {
+          isLinearized = true;
+        }
+      }
+    } catch {
+      // Ignore errors during linearization detection
+    }
+
+    // Find xref offset and detect format
     const xrefParser = new XRefParser(scanner);
     let xrefOffset: number;
+    let usesXRefStreams = false;
 
     try {
       xrefOffset = xrefParser.findStartXRef();
+      // Detect if the document uses XRef streams
+      const format = xrefParser.detectXRefFormat(xrefOffset);
+      usesXRefStreams = format === true;
     } catch {
       xrefOffset = 0;
     }
@@ -457,6 +493,13 @@ export class PDF {
       ? PDFPageTree.load(pagesRef, parsed.getObject.bind(parsed))
       : PDFPageTree.empty();
 
+    // Load Info dictionary if present (for metadata change tracking)
+    const infoRef = parsed.trailer.getRef("Info");
+
+    if (infoRef) {
+      registry.resolve(infoRef);
+    }
+
     const info: DocumentInfo = {
       version: parsed.version,
       securityHandler: parsed.securityHandler,
@@ -473,10 +516,20 @@ export class PDF {
     // Reset flags - after reload, document is no longer "newly created"
     // and any pending security changes have been applied
     this._isNewlyCreated = false;
+    this._recoveredViaBruteForce = parsed.recoveredViaBruteForce;
+    this._isLinearized = isLinearized;
+    this._usesXRefStreams = usesXRefStreams;
     this._pendingSecurity = { action: "none" };
 
-    // Clear cached form so it gets reloaded
+    // Clear cached managers so they get recreated with the new context
+    this._fonts = null;
+    this._attachments = null;
     this._form = undefined;
+
+    // Re-setup font resolver for the new context
+    this.ctx.setFontRefResolver(font => {
+      return this.fonts.getRef(font);
+    });
   }
 
   /**

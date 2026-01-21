@@ -217,6 +217,7 @@ describe("writeXRefStream", () => {
     const entries: XRefWriteEntry[] = [
       { objectNumber: 0, generation: 65535, type: "free", offset: 0 },
       { objectNumber: 1, generation: 0, type: "inuse", offset: 100 },
+      { objectNumber: 2, generation: 0, type: "inuse", offset: 500 }, // xref stream
     ];
 
     const writer = new ByteWriter();
@@ -239,12 +240,13 @@ describe("writeXRefStream", () => {
   it("includes /Type /XRef", () => {
     const entries: XRefWriteEntry[] = [
       { objectNumber: 1, generation: 0, type: "inuse", offset: 100 },
+      { objectNumber: 2, generation: 0, type: "inuse", offset: 500 }, // xref stream
     ];
 
     const writer = new ByteWriter();
     const stream = writeXRefStream(writer, {
       entries,
-      size: 2,
+      size: 3,
       xrefOffset: 500,
       root: PdfRef.of(1, 0),
       streamObjectNumber: 2,
@@ -256,12 +258,13 @@ describe("writeXRefStream", () => {
   it("includes /W array with field widths", () => {
     const entries: XRefWriteEntry[] = [
       { objectNumber: 1, generation: 0, type: "inuse", offset: 100 },
+      { objectNumber: 2, generation: 0, type: "inuse", offset: 500 }, // xref stream
     ];
 
     const writer = new ByteWriter();
     const stream = writeXRefStream(writer, {
       entries,
-      size: 2,
+      size: 3,
       xrefOffset: 500,
       root: PdfRef.of(1, 0),
       streamObjectNumber: 2,
@@ -285,13 +288,13 @@ describe("writeXRefStream", () => {
       size: 7,
       xrefOffset: 500,
       root: PdfRef.of(1, 0),
-      streamObjectNumber: 2,
+      streamObjectNumber: 7, // not in entries, but that's fine for this test
     });
 
     const index = stream.getArray("Index");
 
     expect(index).toBeDefined();
-    // [5, 2] - starting at 5, 2 entries
+    // [5, 2] - objects 5, 6
     expect(index?.length).toBe(2);
   });
 
@@ -299,12 +302,13 @@ describe("writeXRefStream", () => {
     const entries: XRefWriteEntry[] = [
       { objectNumber: 0, generation: 65535, type: "free", offset: 0 },
       { objectNumber: 1, generation: 0, type: "inuse", offset: 255 },
+      { objectNumber: 2, generation: 0, type: "inuse", offset: 500 }, // xref stream
     ];
 
     const writer = new ByteWriter();
     const stream = writeXRefStream(writer, {
       entries,
-      size: 2,
+      size: 3,
       xrefOffset: 500,
       root: PdfRef.of(1, 0),
       streamObjectNumber: 2,
@@ -317,12 +321,13 @@ describe("writeXRefStream", () => {
   it("includes /Prev for incremental updates", () => {
     const entries: XRefWriteEntry[] = [
       { objectNumber: 1, generation: 0, type: "inuse", offset: 100 },
+      { objectNumber: 2, generation: 0, type: "inuse", offset: 500 }, // xref stream
     ];
 
     const writer = new ByteWriter();
     const stream = writeXRefStream(writer, {
       entries,
-      size: 2,
+      size: 3,
       xrefOffset: 500,
       prev: 1234,
       root: PdfRef.of(1, 0),
@@ -332,18 +337,20 @@ describe("writeXRefStream", () => {
     expect(stream.getNumber("Prev")?.value).toBe(1234);
   });
 
-  it("includes /Size", () => {
+  it("uses provided /Size value", () => {
     const entries: XRefWriteEntry[] = [
       { objectNumber: 1, generation: 0, type: "inuse", offset: 100 },
+      { objectNumber: 5, generation: 0, type: "inuse", offset: 500 }, // xref stream
     ];
 
     const writer = new ByteWriter();
+    // Size can be larger than max entry (e.g., for incremental updates)
     const stream = writeXRefStream(writer, {
       entries,
       size: 10,
       xrefOffset: 500,
       root: PdfRef.of(1, 0),
-      streamObjectNumber: 2,
+      streamObjectNumber: 5,
     });
 
     expect(stream.getNumber("Size")?.value).toBe(10);
@@ -368,7 +375,7 @@ describe("writeXRefStream", () => {
       size: 3,
       xrefOffset: 500,
       root: PdfRef.of(1, 0),
-      streamObjectNumber: 3,
+      streamObjectNumber: 3, // not in entries for this test
     });
 
     const data = stream.data;
@@ -381,6 +388,7 @@ describe("writeXRefStream", () => {
     const entrySize = w1 + w2 + w3;
 
     // Check type bytes (first byte of each entry)
+    // Entries are sorted by object number: 0, 1, 2
     expect(data[0 * entrySize]).toBe(0); // free
     expect(data[1 * entrySize]).toBe(1); // inuse
     expect(data[2 * entrySize]).toBe(2); // compressed
@@ -389,12 +397,13 @@ describe("writeXRefStream", () => {
   it("handles large offsets", () => {
     const entries: XRefWriteEntry[] = [
       { objectNumber: 1, generation: 0, type: "inuse", offset: 1000000 },
+      { objectNumber: 2, generation: 0, type: "inuse", offset: 2000000 }, // xref stream
     ];
 
     const writer = new ByteWriter();
     const stream = writeXRefStream(writer, {
       entries,
-      size: 2,
+      size: 3,
       xrefOffset: 2000000,
       root: PdfRef.of(1, 0),
       streamObjectNumber: 2,
@@ -410,12 +419,13 @@ describe("xref stream binary encoding", () => {
     // Small values should use small field widths
     const entries: XRefWriteEntry[] = [
       { objectNumber: 1, generation: 0, type: "inuse", offset: 100 },
+      { objectNumber: 2, generation: 0, type: "inuse", offset: 500 }, // xref stream
     ];
 
     const writer = new ByteWriter();
     const stream = writeXRefStream(writer, {
       entries,
-      size: 2,
+      size: 3,
       xrefOffset: 500,
       root: PdfRef.of(1, 0),
       streamObjectNumber: 2,
@@ -428,8 +438,8 @@ describe("xref stream binary encoding", () => {
 
     // Type is always 1 byte
     expect(w1).toBe(1);
-    // Small offset (100) should fit in 1 byte
-    expect(w2).toBe(1);
+    // Max offset 500 needs 2 bytes
+    expect(w2).toBe(2);
     // Generation 0 should fit in 1 byte
     expect(w3).toBe(1);
   });
@@ -437,12 +447,13 @@ describe("xref stream binary encoding", () => {
   it("increases field widths for large values", () => {
     const entries: XRefWriteEntry[] = [
       { objectNumber: 1, generation: 0, type: "inuse", offset: 100000 },
+      { objectNumber: 2, generation: 0, type: "inuse", offset: 500 }, // xref stream
     ];
 
     const writer = new ByteWriter();
     const stream = writeXRefStream(writer, {
       entries,
-      size: 2,
+      size: 3,
       xrefOffset: 500,
       root: PdfRef.of(1, 0),
       streamObjectNumber: 2,
@@ -469,12 +480,12 @@ describe("xref stream binary encoding", () => {
       size: 12,
       xrefOffset: 500,
       root: PdfRef.of(1, 0),
-      streamObjectNumber: 2,
+      streamObjectNumber: 12, // not in entries for this test
     });
 
     const index = stream.getArray("Index");
 
-    // Should have [1, 2, 10, 2] - two subsections
+    // Should have [1, 2, 10, 2] - two subsections (objects 1-2 and 10-11)
     expect(index?.length).toBe(4);
   });
 });
