@@ -31,7 +31,7 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     locale: "en_US",
-    url: "https://libpdf.com",
+    url: "https://libpdf.dev",
     siteName: "LibPDF",
     title: "LibPDF - The PDF library TypeScript deserves",
     description:
@@ -43,7 +43,7 @@ export const metadata: Metadata = {
     description:
       "Parse, modify, sign, and generate PDFs with a modern TypeScript API. The only library with incremental saves that preserve digital signatures.",
   },
-  metadataBase: new URL("https://libpdf.com"),
+  metadataBase: new URL("https://libpdf.dev"),
 };
 
 export default function Layout({ children }: LayoutProps<"/">) {
