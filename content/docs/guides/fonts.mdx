@@ -1,0 +1,222 @@
+---
+title: Fonts
+description: Work with standard fonts, embed custom fonts, and measure text.
+---
+
+# Fonts
+
+This guide covers font embedding, standard PDF fonts, and text measurement.
+
+## Standard 14 Fonts
+
+PDF defines 14 fonts that every PDF reader must support. These fonts don't need embedding — they're built into the reader.
+
+```typescript
+import { StandardFonts } from "@libpdf/core";
+
+page.drawText("Hello", {
+  x: 50,
+  y: 700,
+  size: 12,
+  font: StandardFonts.Helvetica,
+});
+```
+
+Available fonts:
+
+| Name                     | Description              |
+| ------------------------ | ------------------------ |
+| `Helvetica`              | Sans-serif               |
+| `HelveticaBold`          | Sans-serif bold          |
+| `HelveticaOblique`       | Sans-serif italic        |
+| `HelveticaBoldOblique`   | Sans-serif bold italic   |
+| `TimesRoman`             | Serif                    |
+| `TimesBold`              | Serif bold               |
+| `TimesItalic`            | Serif italic             |
+| `TimesBoldItalic`        | Serif bold italic        |
+| `Courier`                | Monospace                |
+| `CourierBold`            | Monospace bold           |
+| `CourierOblique`         | Monospace italic         |
+| `CourierBoldOblique`     | Monospace bold italic    |
+| `Symbol`                 | Greek and math symbols   |
+| `ZapfDingbats`           | Decorative symbols       |
+
+---
+
+## Embedding Custom Fonts
+
+For fonts not in the Standard 14, embed them from TTF or OTF files:
+
+```typescript
+import { readFile } from "fs/promises";
+
+const fontBytes = await readFile("fonts/OpenSans-Regular.ttf");
+const font = pdf.embedFont(fontBytes);
+
+page.drawText("Custom font text", {
+  x: 50,
+  y: 700,
+  size: 14,
+  font,
+});
+```
+
+### Font Subsetting
+
+By default, fonts are subsetted when saving — only the glyphs used in the document are included. This reduces file size significantly.
+
+```typescript
+// Subsetting enabled by default
+await pdf.save();
+
+// Disable subsetting (larger file, but font fully preserved)
+await pdf.save({ subsetFonts: false });
+```
+
+---
+
+## Text Measurement
+
+To calculate text dimensions before drawing, use measurement methods on font objects.
+
+### Measuring with Standard Fonts
+
+Use `Standard14Font.of()` to create a font instance for measurement:
+
+```typescript
+import { Standard14Font, StandardFonts } from "@libpdf/core";
+
+const font = Standard14Font.of(StandardFonts.HelveticaBold);
+
+const width = font.widthOfTextAtSize("Hello, World!", 12);
+const height = font.heightAtSize(12);
+```
+
+Available measurement methods:
+
+| Method                       | Description                              |
+| ---------------------------- | ---------------------------------------- |
+| `widthOfTextAtSize(text, size)` | Width of text in points                  |
+| `heightAtSize(size)`            | Full height (ascent to descent) in points |
+| `sizeAtWidth(text, width)`      | Font size to fit text within a width     |
+| `sizeAtHeight(height)`          | Font size to achieve a height            |
+
+### Measuring with Embedded Fonts
+
+`EmbeddedFont` provides the same measurement API:
+
+```typescript
+const fontBytes = await readFile("fonts/OpenSans-Regular.ttf");
+const font = pdf.embedFont(fontBytes);
+
+const width = font.widthOfTextAtSize("Hello, World!", 12);
+const height = font.heightAtSize(12);
+```
+
+### Standalone measureText Helper
+
+For quick measurements without creating a font object:
+
+```typescript
+import { measureText, StandardFonts } from "@libpdf/core";
+
+// With a standard font name
+const width = measureText("Hello", StandardFonts.HelveticaBold, 12);
+
+// With an embedded font
+const width = measureText("Hello", embeddedFont, 12);
+```
+
+---
+
+## Text Alignment
+
+For multiline text with `maxWidth`, use the `alignment` option:
+
+```typescript
+page.drawText("This paragraph will be centered within the max width.", {
+  x: 50,
+  y: 700,
+  size: 12,
+  maxWidth: 200,
+  alignment: "center", // "left" | "center" | "right" | "justify"
+});
+```
+
+For single-line text or custom positioning, calculate the position manually:
+
+```typescript
+import { Standard14Font, StandardFonts } from "@libpdf/core";
+
+const text = "Centered Title";
+const fontSize = 24;
+const font = Standard14Font.of(StandardFonts.HelveticaBold);
+
+const textWidth = font.widthOfTextAtSize(text, fontSize);
+const x = (page.width - textWidth) / 2;
+
+page.drawText(text, {
+  x,
+  y: 700,
+  size: fontSize,
+  font: StandardFonts.HelveticaBold,
+});
+```
+
+---
+
+## Common Patterns
+
+### Fitting Text to a Width
+
+```typescript
+const text = "This text must fit";
+const maxWidth = 200;
+const font = Standard14Font.of(StandardFonts.Helvetica);
+
+const fontSize = font.sizeAtWidth(text, maxWidth);
+
+page.drawText(text, {
+  x: 50,
+  y: 700,
+  size: fontSize,
+});
+```
+
+### Text with Background
+
+```typescript
+import { Standard14Font, StandardFonts, rgb } from "@libpdf/core";
+
+const text = "Highlighted";
+const fontSize = 14;
+const padding = 4;
+const font = Standard14Font.of(StandardFonts.HelveticaBold);
+
+const textWidth = font.widthOfTextAtSize(text, fontSize);
+const textHeight = font.heightAtSize(fontSize);
+
+// Draw background
+page.drawRectangle({
+  x: 50 - padding,
+  y: 700 - padding,
+  width: textWidth + padding * 2,
+  height: textHeight + padding * 2,
+  color: rgb(1, 1, 0), // Yellow
+});
+
+// Draw text on top
+page.drawText(text, {
+  x: 50,
+  y: 700,
+  size: fontSize,
+  font: StandardFonts.HelveticaBold,
+});
+```
+
+---
+
+## See Also
+
+- [Drawing](/docs/guides/drawing) - Draw text, shapes, and images
+- [Forms](/docs/guides/forms) - Set fonts on form fields
