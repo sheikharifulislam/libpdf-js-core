@@ -58,7 +58,7 @@ bun add @libpdf/core
 import { PDF } from "@libpdf/core";
 
 const pdf = await PDF.load(bytes);
-const pages = await pdf.getPages();
+const pages = pdf.getPages();
 
 console.log(`${pages.length} pages`);
 ```
@@ -73,7 +73,7 @@ const pdf = await PDF.load(bytes, { credentials: "password" });
 
 ```typescript
 const pdf = await PDF.load(bytes);
-const form = await pdf.getForm();
+const form = pdf.getForm();
 
 form.fill({
   name: "Jane Doe",
