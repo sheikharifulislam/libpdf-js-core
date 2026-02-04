@@ -4,7 +4,14 @@ import { DocsLayout } from "fumadocs-ui/layouts/docs";
 
 export default function Layout({ children }: LayoutProps<"/docs">) {
   return (
-    <DocsLayout tree={source.getPageTree()} {...baseOptions()} tabMode="top">
+    <DocsLayout
+      tree={source.getPageTree()}
+      {...baseOptions()}
+      tabMode="top"
+      sidebar={{
+        prefetch: false,
+      }}
+    >
       {children}
     </DocsLayout>
   );
