@@ -184,7 +184,7 @@ We welcome contributions! See our [contributing guide](CONTRIBUTING.md) for deta
 
 ```bash
 # Clone the repo
-git clone https://github.com/libpdf/core.git
+git clone https://github.com/LibPDF-js/core.git libpdf
 cd libpdf
 
 # Install dependencies
